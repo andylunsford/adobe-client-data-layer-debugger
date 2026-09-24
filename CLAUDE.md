@@ -39,7 +39,7 @@ build.mjs                        # esbuild bundle script (IIFE format), shared e
 vitest.config.js                 # node default, jsdom for acdl-hook
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
 assets/
-  icon-source.png                 # 1300×1300 source artwork (not shipped in dist/)
+  icon-source.png                # 1300×1300 source artwork (not shipped in dist/)
 src/
   inject.js                      # page-world entry (must be self-contained IIFE)
   content.js                     # isolated-world bridge
