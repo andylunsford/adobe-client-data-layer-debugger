@@ -6,7 +6,10 @@ const els = {
   empty: document.getElementById('empty'),
   detailMessage: document.getElementById('detail-message'),
   detailState: document.getElementById('detail-state'),
-  tabs: document.querySelectorAll('.tab')
+  tabs: document.querySelectorAll('.tab'),
+  annForm: document.getElementById('annotation'),
+  annLabel: document.getElementById('ann-label'),
+  annNote: document.getElementById('ann-note')
 };
 
 els.banner = document.getElementById('banner');
@@ -24,9 +27,64 @@ let port = null;
 let activeTabId = null;
 let panelWindowId = null;
 let capture = null;
-let selectedIndex = null;
+let selectedSeq = null;
 
 function setStatus(text) { els.status.textContent = text; }
+
+const ANNOTATION_SAVE_DEBOUNCE_MS = 400;
+let saveTimer = null;
+let lastSaved = { label: '', note: '' };
+
+function formValues() {
+  return { label: els.annLabel.value.trim(), note: els.annNote.value.trim() };
+}
+
+function isEditingAnnotation() {
+  return document.activeElement === els.annLabel || document.activeElement === els.annNote;
+}
+
+function loadAnnotationForm(ev) {
+  lastSaved = { label: ev?.annotation?.label || '', note: ev?.annotation?.note || '' };
+  els.annLabel.value = lastSaved.label;
+  els.annNote.value = lastSaved.note;
+  els.annLabel.disabled = els.annNote.disabled = !ev;
+  els.annLabel.placeholder = ev ? 'Label (e.g. clicked Apply CTA)' : 'Select an event to annotate';
+  els.annNote.placeholder = ev ? 'Note — what triggered this event?' : '';
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, ANNOTATION_SAVE_DEBOUNCE_MS);
+}
+
+async function flushSave() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  const seq = selectedSeq;
+  const tabId = activeTabId;
+  if (seq === null || tabId === null) return;
+  const values = formValues();
+  if (values.label === lastSaved.label && values.note === lastSaved.note) return;
+  lastSaved = values;
+  const resp = await chrome.runtime.sendMessage({ type: 'annotate', tabId, seq, ...values });
+  if (!resp?.ok) setStatus('Event no longer in capture.');
+}
+
+function renderRowAnnotation(li, ev) {
+  li.querySelector('.event-annotation')?.remove();
+  li.title = ev.annotation?.note || '';
+  if (!ev.annotation) return;
+  const tag = document.createElement('span');
+  tag.className = 'event-annotation';
+  tag.textContent = ev.annotation.label || '📝 note';
+  li.insertBefore(tag, li.querySelector('.event-meta'));
+}
+
+els.annForm.addEventListener('submit', (e) => { e.preventDefault(); flushSave(); });
+els.annLabel.addEventListener('input', scheduleSave);
+els.annNote.addEventListener('input', scheduleSave);
+els.annLabel.addEventListener('blur', flushSave);
+els.annNote.addEventListener('blur', flushSave);
 
 function renderAll() {
   els.list.innerHTML = '';
@@ -34,6 +92,7 @@ function renderAll() {
     els.empty.classList.remove('hidden');
     els.detailMessage.textContent = '';
     els.detailState.textContent = '';
+    loadAnnotationForm(null);
     return;
   }
   els.empty.classList.add('hidden');
@@ -48,7 +107,7 @@ function renderAll() {
     }
     appendEventRow(ev);
   }
-  if (selectedIndex !== null) selectByIndex(selectedIndex);
+  if (selectedSeq !== null) selectBySeq(selectedSeq);
 }
 
 function appendPageDivider(page) {
@@ -66,7 +125,7 @@ function updatePageDivider(page) {
 
 function appendEventRow(ev) {
   const li = document.createElement('li');
-  li.dataset.index = String(ev.index);
+  li.dataset.seq = String(ev.seq);
   const name = document.createElement('span');
   name.className = 'event-name';
   name.textContent = ev.eventName ? ev.eventName : `(${ev.eventType})`;
@@ -74,7 +133,8 @@ function appendEventRow(ev) {
   meta.className = 'event-meta';
   meta.textContent = `#${ev.index} · ${formatTime(ev.timestamp)}${ev.stateSerialization === 'fallback' ? ' · fallback' : ''}`;
   li.append(name, meta);
-  li.addEventListener('click', () => selectByIndex(ev.index));
+  li.addEventListener('click', () => selectBySeq(ev.seq));
+  renderRowAnnotation(li, ev);
   els.list.appendChild(li);
 }
 
@@ -103,12 +163,14 @@ function highlightJson(value) {
   );
 }
 
-function selectByIndex(index) {
-  selectedIndex = index;
-  for (const li of els.list.querySelectorAll('li[data-index]')) {
-    li.classList.toggle('is-selected', li.dataset.index === String(index));
+function selectBySeq(seq) {
+  if (seq !== selectedSeq) flushSave();
+  selectedSeq = seq;
+  for (const li of els.list.querySelectorAll('li[data-seq]')) {
+    li.classList.toggle('is-selected', li.dataset.seq === String(seq));
   }
-  const ev = capture.events.find(e => e.index === index);
+  const ev = capture.events.find(e => e.seq === seq);
+  loadAnnotationForm(ev);
   if (!ev) return;
   els.detailMessage.innerHTML = highlightJson(ev.message);
   els.detailState.innerHTML = highlightJson(ev.state);
@@ -119,6 +181,7 @@ function formatTime(iso) {
 }
 
 function connectAndSubscribe(tabId) {
+  flushSave();
   if (port) port.disconnect();
   port = chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' });
   port.onMessage.addListener(handleMessage);
@@ -128,8 +191,11 @@ function connectAndSubscribe(tabId) {
 
 function handleMessage(msg) {
   if (msg.type === 'snapshot') {
+    clearTimeout(saveTimer);
+    saveTimer = null;
     capture = msg.capture || { tabId: msg.tabId, captureStart: '', pages: [], events: [] };
-    selectedIndex = null;
+    selectedSeq = null;
+    loadAnnotationForm(null);
     hideBanner();
     setStatus(capture.events.length ? `${capture.events.length} events captured` : 'Listening…');
     renderAll();
@@ -155,18 +221,34 @@ function handleMessage(msg) {
       hideBanner();
     }
   } else if (msg.type === 'cleared') {
+    clearTimeout(saveTimer);
+    saveTimer = null;
     capture = { tabId: activeTabId, captureStart: new Date().toISOString(), pages: [], events: [] };
-    selectedIndex = null;
+    selectedSeq = null;
+    loadAnnotationForm(null);
     setStatus('Listening…');
     renderAll();
   } else if (msg.type === 'tab-closed') {
+    clearTimeout(saveTimer);
+    saveTimer = null;
     capture = null;
+    selectedSeq = null;
+    loadAnnotationForm(null);
     setStatus('Tab closed.');
     renderAll();
   } else if (msg.type === 'trimmed') {
     setStatus(`${capture.events.length} events captured · trimmed ${msg.count} oldest`);
     showBanner(`Capture trimmed: ${msg.count} oldest events dropped to stay under memory limits.`);
     setTimeout(hideBanner, 8000);
+  } else if (msg.type === 'annotation-updated') {
+    if (!capture) return;
+    const ev = capture.events.find(e => e.seq === msg.seq);
+    if (!ev) return;
+    if (msg.annotation) ev.annotation = msg.annotation;
+    else delete ev.annotation;
+    const li = els.list.querySelector(`li[data-seq="${msg.seq}"]`);
+    if (li) renderRowAnnotation(li, ev);
+    if (msg.seq === selectedSeq && !isEditingAnnotation()) loadAnnotationForm(ev);
   }
 }
 

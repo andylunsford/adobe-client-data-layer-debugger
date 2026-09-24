@@ -20,6 +20,10 @@
       <div id="empty" class="empty">No events yet.</div>
     </section>
     <section class="detail" aria-label="Event detail">
+      <form id="annotation" class="annotation" autocomplete="off">
+        <input id="ann-label" type="text" maxlength="60" placeholder="Select an event to annotate" disabled />
+        <textarea id="ann-note" rows="3" maxlength="2000" disabled></textarea>
+      </form>
       <nav class="tabs">
         <button class="tab is-active" data-tab="message" type="button">Message</button>
         <button class="tab" data-tab="state" type="button">State</button>

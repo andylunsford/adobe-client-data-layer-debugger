@@ -149,3 +149,38 @@ body {
   color: var(--text);
 }
 .banner.hidden { display: none; }
+
+.annotation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.annotation input,
+.annotation textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.annotation textarea { resize: vertical; min-height: 3.5em; }
+.annotation input:focus,
+.annotation textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.annotation :disabled { background: var(--bg-secondary); cursor: not-allowed; }
+
+#event-list li .event-annotation {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--selected-bg);
+  color: var(--accent);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
