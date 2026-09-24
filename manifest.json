@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Adobe Client Data Layer Debugger",
+  "version": "0.1.0",
+  "description": "Capture and inspect every push to window.adobeDataLayer with full state snapshots.",
+  "permissions": ["storage", "tabs", "webNavigation", "sidePanel", "downloads"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "Adobe Data Layer Debugger",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": { "default_path": "sidepanel/index.html" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }],
+  "web_accessible_resources": [{
+    "resources": ["inject.js"],
+    "matches": ["<all_urls>"]
+  }]
+}

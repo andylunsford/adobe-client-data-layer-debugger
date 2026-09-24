@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Adobe Data Layer Debugger</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="bar">
+    <span class="title">Adobe Data Layer</span>
+    <span id="status" class="status">Connecting…</span>
+    <button id="clear" type="button">Clear</button>
+    <button id="export" type="button">Export</button>
+  </header>
+  <div id="banner" class="banner hidden"></div>
+  <main class="grid">
+    <section class="events" aria-label="Event list">
+      <ol id="event-list"></ol>
+      <div id="empty" class="empty">No events yet.</div>
+    </section>
+    <section class="detail" aria-label="Event detail">
+      <nav class="tabs">
+        <button class="tab is-active" data-tab="message" type="button">Message</button>
+        <button class="tab" data-tab="state" type="button">State</button>
+      </nav>
+      <pre id="detail-message" class="json"></pre>
+      <pre id="detail-state" class="json hidden"></pre>
+    </section>
+  </main>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
