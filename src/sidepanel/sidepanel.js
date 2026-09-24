@@ -177,7 +177,12 @@ function selectBySeq(seq) {
   }
   const ev = capture.events.find(e => e.seq === seq);
   loadAnnotationForm(ev);
-  if (!ev) return;
+  if (!ev) {
+    selectedSeq = null;
+    els.detailMessage.textContent = '';
+    els.detailState.textContent = '';
+    return;
+  }
   els.detailMessage.innerHTML = highlightJson(ev.message);
   els.detailState.innerHTML = highlightJson(ev.state);
 }
