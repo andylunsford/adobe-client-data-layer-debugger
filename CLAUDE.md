@@ -85,7 +85,7 @@ Load `dist/` as an unpacked extension at `chrome://extensions` (Developer mode o
 - **`structuredClone` in jsdom:** partial support — that's why `safe-clone.js` has a fallback path with `[Function]`, `[HTMLElement: <tag>]`, `[Circular →path]` markers. Tests exercise both branches.
 - **MV3 service worker eviction:** every store mutation marks the tab dirty; a 1s debounced flush writes to `chrome.storage.session`. SW wake calls `rehydrate()` before processing new messages.
 - **Side panel always reflects the *active* tab,** not the tab it was opened from. `chrome.tabs.onActivated` triggers re-subscribe.
-- **Page-load entries are authored by `inject.js`,** not `webNavigation`. Task 10's `webNavigation` listener is intentionally a no-op — kept for v2 diagnostics.
+- **Page-load entries are authored by `inject.js`,** not `webNavigation`.
 - **`crypto.getRandomValues`** is used in `ids.js` — works in both Node 18+ and browsers.
 - **Captures persist across top-level navigation;** only Clear, tab close, or browser close drop them. `webNavigation` permission is unused (kept for v2 diagnostics).
 - **`seq` vs `index`:** `index` is per page load (assigned in `inject.js`, restarts at 1). `seq` is tab-wide and assigned by `event-store`; the side panel and `annotate` message key on `seq`.

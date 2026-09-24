@@ -65,9 +65,15 @@ async function flushSave() {
   if (seq === null || tabId === null) return;
   const values = formValues();
   if (values.label === lastSaved.label && values.note === lastSaved.note) return;
+  const previous = lastSaved;
   lastSaved = values;
-  const resp = await chrome.runtime.sendMessage({ type: 'annotate', tabId, seq, ...values });
-  if (!resp?.ok) setStatus('Event no longer in capture.');
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: 'annotate', tabId, seq, ...values });
+    if (!resp?.ok) setStatus('Event no longer in capture.');
+  } catch {
+    setStatus('Annotation save failed — edit again to retry.');
+    if (selectedSeq === seq && activeTabId === tabId) lastSaved = previous;
+  }
 }
 
 function renderRowAnnotation(li, ev) {
@@ -181,7 +187,6 @@ function formatTime(iso) {
 }
 
 function connectAndSubscribe(tabId) {
-  flushSave();
   if (port) port.disconnect();
   port = chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' });
   port.onMessage.addListener(handleMessage);
@@ -237,6 +242,9 @@ function handleMessage(msg) {
     setStatus('Tab closed.');
     renderAll();
   } else if (msg.type === 'trimmed') {
+    if (!capture) return;
+    capture.events.splice(0, msg.count);
+    renderAll();
     setStatus(`${capture.events.length} events captured · trimmed ${msg.count} oldest`);
     showBanner(`Capture trimmed: ${msg.count} oldest events dropped to stay under memory limits.`);
     setTimeout(hideBanner, 8000);
@@ -305,6 +313,7 @@ async function init() {
 
 chrome.tabs.onActivated.addListener(async (info) => {
   if (panelWindowId !== null && info.windowId !== panelWindowId) return;
+  flushSave();
   activeTabId = info.tabId;
   connectAndSubscribe(activeTabId);
 });
