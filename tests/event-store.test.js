@@ -114,4 +114,46 @@ describe('eventStore', () => {
     revived.replaceCapture(7, persisted);
     expect(revived.appendEvent(7, evt(3)).seq).toBe(3);
   });
+
+  it('setAnnotation stores trimmed label and note with updatedAt', () => {
+    store.appendEvent(7, evt(1));
+    const a = store.setAnnotation(7, 1, { label: '  clicked CTA ', note: ' fired once\n' }, '2026-09-24T00:00:00.000Z');
+    expect(a).toEqual({ label: 'clicked CTA', note: 'fired once', updatedAt: '2026-09-24T00:00:00.000Z' });
+    expect(store.getCapture(7).events[0].annotation).toEqual(a);
+  });
+
+  it('setAnnotation overwrites a previous annotation', () => {
+    store.appendEvent(7, evt(1));
+    store.setAnnotation(7, 1, { label: 'old', note: '' }, 't1');
+    store.setAnnotation(7, 1, { label: 'new', note: 'n' }, 't2');
+    expect(store.getCapture(7).events[0].annotation).toEqual({ label: 'new', note: 'n', updatedAt: 't2' });
+  });
+
+  it('setAnnotation truncates label to 60 and note to 2000 chars', () => {
+    store.appendEvent(7, evt(1));
+    const a = store.setAnnotation(7, 1, { label: 'x'.repeat(100), note: 'y'.repeat(3000) });
+    expect(a.label).toHaveLength(60);
+    expect(a.note).toHaveLength(2000);
+  });
+
+  it('setAnnotation removes the annotation when both fields are blank', () => {
+    store.appendEvent(7, evt(1));
+    store.setAnnotation(7, 1, { label: 'x', note: 'y' });
+    expect(store.setAnnotation(7, 1, { label: '  ', note: '' })).toEqual({ removed: true });
+    expect(store.getCapture(7).events[0]).not.toHaveProperty('annotation');
+  });
+
+  it('setAnnotation returns null for an unknown tab or seq', () => {
+    store.appendEvent(7, evt(1));
+    expect(store.setAnnotation(99, 1, { label: 'x' })).toBeNull();
+    expect(store.setAnnotation(7, 42, { label: 'x' })).toBeNull();
+  });
+
+  it('annotated events are FIFO-trimmed like any other', () => {
+    store.appendEvent(7, evt(1));
+    store.setAnnotation(7, 1, { label: 'keep?' });
+    for (let i = 2; i <= 6; i++) store.appendEvent(7, evt(i));
+    expect(store.getCapture(7).events.some(e => e.annotation)).toBe(false);
+    expect(store.setAnnotation(7, 1, { label: 'x' })).toBeNull();
+  });
 });

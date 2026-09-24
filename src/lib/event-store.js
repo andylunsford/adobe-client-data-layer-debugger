@@ -1,3 +1,6 @@
+const MAX_LABEL_LENGTH = 60;
+const MAX_NOTE_LENGTH = 2000;
+
 export function createEventStore({ maxEventsPerTab = 5000, trimChunk = 1000 } = {}) {
   const tabs = new Map();
 
@@ -32,6 +35,21 @@ export function createEventStore({ maxEventsPerTab = 5000, trimChunk = 1000 } = 
     addPageLoad(tabId, pageLoad) {
       const cap = ensure(tabId);
       cap.pages.push(pageLoad);
+    },
+
+    setAnnotation(tabId, seq, { label = '', note = '' } = {}, now = new Date().toISOString()) {
+      const event = tabs.get(tabId)?.events.find(e => e.seq === seq);
+      if (!event) return null;
+      const clean = {
+        label: label.trim().slice(0, MAX_LABEL_LENGTH),
+        note: note.trim().slice(0, MAX_NOTE_LENGTH)
+      };
+      if (!clean.label && !clean.note) {
+        delete event.annotation;
+        return { removed: true };
+      }
+      event.annotation = { ...clean, updatedAt: now };
+      return event.annotation;
     },
 
     getCapture(tabId) {
