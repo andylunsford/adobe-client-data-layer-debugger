@@ -1,6 +1,6 @@
 {
   "name": "acdl-debugger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Chrome extension for debugging the Adobe Client Data Layer.",
   "type": "module",
