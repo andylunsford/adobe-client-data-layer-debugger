@@ -70,14 +70,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   panelPorts.delete(tabId);
 });
 
-// Clear capture on each new top-level navigation so each page starts fresh.
-chrome.webNavigation.onCommitted.addListener((details) => {
-  if (details.frameId !== 0) return;
-  store.clearTab(details.tabId);
-  markDirty(details.tabId);
-  broadcast(details.tabId, { type: 'cleared', tabId: details.tabId });
-});
-
 // Receive page-world messages forwarded by content.js
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.kind !== 'page-message') return;
@@ -137,6 +129,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     store.clearTab(tabId);
     markDirty(tabId);
     broadcast(tabId, { type: 'cleared', tabId });
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (msg.type === 'annotate') {
+    const { tabId, seq, label, note } = msg;
+    const result = store.setAnnotation(tabId, seq, { label, note });
+    if (!result) {
+      sendResponse({ ok: false, error: 'not-found' });
+      return true;
+    }
+    markDirty(tabId);
+    broadcast(tabId, { type: 'annotation-updated', tabId, seq, annotation: result.removed ? null : result });
     sendResponse({ ok: true });
     return true;
   }
