@@ -1,7 +1,9 @@
 import { createPanelConnection } from '../lib/panel-connection.js';
+import { applyTheme, loadTheme, nextTheme, saveTheme } from '../lib/theme.js';
 
 const els = {
   status: document.getElementById('status'),
+  theme: document.getElementById('theme'),
   clear: document.getElementById('clear'),
   export: document.getElementById('export'),
   list: document.getElementById('event-list'),
@@ -307,9 +309,32 @@ function safeHostFromCapture(env) {
   catch { return null; }
 }
 
+const THEME_LABELS = { system: 'System', light: 'Light', dark: 'Dark' };
+let theme = loadTheme(localStorage);
+
+function renderThemeButton() {
+  const label = `Theme: ${THEME_LABELS[theme]}`;
+  els.theme.dataset.choice = theme;
+  els.theme.title = `${label} (click to change)`;
+  els.theme.setAttribute('aria-label', label);
+}
+
+els.theme.addEventListener('click', () => {
+  theme = nextTheme(theme);
+  saveTheme(localStorage, theme);
+  applyTheme(document.documentElement, theme);
+  renderThemeButton();
+});
+
+renderThemeButton();
+
 async function init() {
   connection = createPanelConnection({
-    connect: () => chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' }),
+    connect: () => {
+      const port = chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' });
+      port.onDisconnect.addListener(() => void chrome.runtime.lastError);
+      return port;
+    },
     onMessage: handleMessage,
     onReconnecting: () => setStatus('Reconnecting…')
   });

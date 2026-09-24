@@ -1,42 +1,24 @@
 :root {
-  --bg: #ffffff;
-  --bg-secondary: #f6f8fa;
-  --bg-hover: #f3f4f6;
-  --text: #1f2328;
-  --text-muted: #57606a;
-  --border: #d0d7de;
-  --border-subtle: #eaeef2;
-  --selected-bg: #ddf4ff;
-  --accent: #0969da;
-  --banner-bg: #fff8c5;
-  --banner-border: #d4a72c;
-  --json-key: #0550ae;
-  --json-string: #0a3069;
-  --json-number: #953800;
-  --json-boolean: #8250df;
-  --json-null: #cf222e;
+  color-scheme: light dark;
+  --bg: light-dark(#ffffff, #0d1117);
+  --bg-secondary: light-dark(#f6f8fa, #161b22);
+  --bg-hover: light-dark(#f3f4f6, #1c2128);
+  --text: light-dark(#1f2328, #e6edf3);
+  --text-muted: light-dark(#57606a, #8b949e);
+  --border: light-dark(#d0d7de, #30363d);
+  --border-subtle: light-dark(#eaeef2, #21262d);
+  --selected-bg: light-dark(#ddf4ff, #033d6b);
+  --accent: light-dark(#0969da, #58a6ff);
+  --banner-bg: light-dark(#fff8c5, #3a2e08);
+  --banner-border: light-dark(#d4a72c, #d29922);
+  --json-key: light-dark(#0550ae, #79c0ff);
+  --json-string: light-dark(#0a3069, #a5d6ff);
+  --json-number: light-dark(#953800, #ffa657);
+  --json-boolean: light-dark(#8250df, #d2a8ff);
+  --json-null: light-dark(#cf222e, #ff7b72);
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-hover: #1c2128;
-    --text: #e6edf3;
-    --text-muted: #8b949e;
-    --border: #30363d;
-    --border-subtle: #21262d;
-    --selected-bg: #033d6b;
-    --accent: #58a6ff;
-    --banner-bg: #3a2e08;
-    --banner-border: #d29922;
-    --json-key: #79c0ff;
-    --json-string: #a5d6ff;
-    --json-number: #ffa657;
-    --json-boolean: #d2a8ff;
-    --json-null: #ff7b72;
-  }
-}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -184,3 +166,14 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.bar .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+}
+.theme-icon { width: 16px; height: 16px; display: none; }
+#theme[data-choice="system"] .theme-icon-system,
+#theme[data-choice="light"] .theme-icon-light,
+#theme[data-choice="dark"] .theme-icon-dark { display: block; }
