@@ -1,7 +1,7 @@
 export function buildExportEnvelope({ capture, extensionVersion, userAgent, exportedAt }) {
   const captureEnd = capture.events.length === 0 ? capture.captureStart : exportedAt;
   return {
-    schemaVersion: '1.0',
+    schemaVersion: '1.1',
     extensionVersion,
     exportedAt,
     captureStart: capture.captureStart,

@@ -21,7 +21,7 @@ describe('buildExportEnvelope', () => {
       exportedAt: '2026-04-27T15:31:42.000Z'
     });
     expect(env).toEqual({
-      schemaVersion: '1.0',
+      schemaVersion: '1.1',
       extensionVersion: '0.1.0',
       exportedAt: '2026-04-27T15:31:42.000Z',
       captureStart: '2026-04-27T15:29:00.000Z',
@@ -41,5 +41,20 @@ describe('buildExportEnvelope', () => {
       exportedAt: '2026-04-27T15:31:42.000Z'
     });
     expect(env.captureEnd).toBe('2026-04-27T15:29:00.000Z');
+  });
+
+  it('passes seq and annotation through on events', () => {
+    const annotated = {
+      ...sampleCapture,
+      events: [{ ...sampleCapture.events[0], seq: 1, annotation: { label: 'l', note: 'n', updatedAt: 't' } }]
+    };
+    const env = buildExportEnvelope({
+      capture: annotated,
+      extensionVersion: '0.2.0',
+      userAgent: 'ua',
+      exportedAt: '2026-04-27T15:31:42.000Z'
+    });
+    expect(env.events[0].seq).toBe(1);
+    expect(env.events[0].annotation).toEqual({ label: 'l', note: 'n', updatedAt: 't' });
   });
 });
