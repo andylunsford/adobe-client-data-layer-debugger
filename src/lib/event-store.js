@@ -7,6 +7,7 @@ export function createEventStore({ maxEventsPerTab = 5000, trimChunk = 1000 } = 
       cap = {
         tabId,
         captureStart: new Date().toISOString(),
+        nextSeq: 1,
         pages: [],
         events: []
       };
@@ -18,12 +19,14 @@ export function createEventStore({ maxEventsPerTab = 5000, trimChunk = 1000 } = 
   return {
     appendEvent(tabId, event) {
       const cap = ensure(tabId);
+      const seq = cap.nextSeq++;
+      event.seq = seq;
       cap.events.push(event);
       if (cap.events.length > maxEventsPerTab) {
         cap.events.splice(0, trimChunk);
-        return { trimmed: trimChunk };
+        return { trimmed: trimChunk, seq };
       }
-      return { trimmed: 0 };
+      return { trimmed: 0, seq };
     },
 
     addPageLoad(tabId, pageLoad) {
