@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.1.0).** All four pieces and five lib modules are built; 24 unit tests pass (`npm test`). `npm run build` produces a loadable `dist/`.
+**Implemented (v0.2.0).** All four pieces and five lib modules are built; 36 unit tests pass (`npm test`). `npm run build` produces a loadable `dist/`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab.
 
 Next work is v0.2+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -65,7 +65,7 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 npm install
 npm run icons      # one-time: generate placeholder icons
 npm run build      # produces ./dist
-npm test           # 24 unit tests across 5 lib modules
+npm test           # 36 unit tests across 5 lib modules
 npm run build:watch
 ```
 
@@ -87,10 +87,12 @@ Load `dist/` as an unpacked extension at `chrome://extensions` (Developer mode o
 - **Side panel always reflects the *active* tab,** not the tab it was opened from. `chrome.tabs.onActivated` triggers re-subscribe.
 - **Page-load entries are authored by `inject.js`,** not `webNavigation`. Task 10's `webNavigation` listener is intentionally a no-op — kept for v2 diagnostics.
 - **`crypto.getRandomValues`** is used in `ids.js` — works in both Node 18+ and browsers.
+- **Captures persist across top-level navigation;** only Clear, tab close, or browser close drop them. `webNavigation` permission is unused (kept for v2 diagnostics).
+- **`seq` vs `index`:** `index` is per page load (assigned in `inject.js`, restarts at 1). `seq` is tab-wide and assigned by `event-store`; the side panel and `annotate` message key on `seq`.
 
 ## Out of scope (v1)
 
-Cross-origin iframe ACDL capture · search/filter · state diffs · replay · Puppeteer/Playwright E2E. All deferred to v0.2+.
+Cross-origin iframe ACDL capture · search/filter · state diffs · replay · Puppeteer/Playwright E2E · annotating page dividers · exempting annotated events from trim. All deferred to v0.2+.
 
 ## Manual smoke test sites
 
