@@ -1,3 +1,5 @@
+import { createPanelConnection } from '../lib/panel-connection.js';
+
 const els = {
   status: document.getElementById('status'),
   clear: document.getElementById('clear'),
@@ -9,7 +11,8 @@ const els = {
   tabs: document.querySelectorAll('.tab'),
   annForm: document.getElementById('annotation'),
   annLabel: document.getElementById('ann-label'),
-  annNote: document.getElementById('ann-note')
+  annNote: document.getElementById('ann-note'),
+  eventsPane: document.querySelector('.events')
 };
 
 els.banner = document.getElementById('banner');
@@ -23,7 +26,7 @@ function hideBanner() {
   els.banner.textContent = '';
 }
 
-let port = null;
+let connection = null;
 let activeTabId = null;
 let panelWindowId = null;
 let capture = null;
@@ -170,13 +173,14 @@ function highlightJson(value) {
 }
 
 function selectBySeq(seq) {
-  if (seq !== selectedSeq) flushSave();
+  const reselecting = seq === selectedSeq;
+  if (!reselecting) flushSave();
   selectedSeq = seq;
   for (const li of els.list.querySelectorAll('li[data-seq]')) {
     li.classList.toggle('is-selected', li.dataset.seq === String(seq));
   }
   const ev = capture.events.find(e => e.seq === seq);
-  loadAnnotationForm(ev);
+  if (!ev || !(reselecting && isEditingAnnotation())) loadAnnotationForm(ev);
   if (!ev) {
     selectedSeq = null;
     els.detailMessage.textContent = '';
@@ -191,24 +195,22 @@ function formatTime(iso) {
   return iso.slice(11, 23);
 }
 
-function connectAndSubscribe(tabId) {
-  if (port) port.disconnect();
-  port = chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' });
-  port.onMessage.addListener(handleMessage);
-  port.onDisconnect.addListener(() => { port = null; });
-  port.postMessage({ type: 'subscribe', tabId });
-}
-
 function handleMessage(msg) {
+  if (msg.tabId !== undefined && msg.tabId !== activeTabId) return;
   if (msg.type === 'snapshot') {
-    clearTimeout(saveTimer);
-    saveTimer = null;
+    const isResync = capture?.tabId === msg.tabId;
+    const scrollTop = isResync ? els.eventsPane.scrollTop : 0;
+    if (!isResync) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      selectedSeq = null;
+      loadAnnotationForm(null);
+    }
     capture = msg.capture || { tabId: msg.tabId, captureStart: '', pages: [], events: [] };
-    selectedSeq = null;
-    loadAnnotationForm(null);
     hideBanner();
     setStatus(capture.events.length ? `${capture.events.length} events captured` : 'Listening…');
     renderAll();
+    els.eventsPane.scrollTop = scrollTop;
   } else if (msg.type === 'event-appended') {
     if (!capture) return;
     capture.events.push(msg.event);
@@ -306,6 +308,11 @@ function safeHostFromCapture(env) {
 }
 
 async function init() {
+  connection = createPanelConnection({
+    connect: () => chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' }),
+    onMessage: handleMessage,
+    onReconnecting: () => setStatus('Reconnecting…')
+  });
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) {
     setStatus('No active tab.');
@@ -313,14 +320,14 @@ async function init() {
   }
   panelWindowId = tab.windowId;
   activeTabId = tab.id;
-  connectAndSubscribe(activeTabId);
+  connection.subscribe(activeTabId);
 }
 
-chrome.tabs.onActivated.addListener(async (info) => {
+chrome.tabs.onActivated.addListener((info) => {
   if (panelWindowId !== null && info.windowId !== panelWindowId) return;
   flushSave();
   activeTabId = info.tabId;
-  connectAndSubscribe(activeTabId);
+  connection.subscribe(activeTabId);
 });
 
 init();
