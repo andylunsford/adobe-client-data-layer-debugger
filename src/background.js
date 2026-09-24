@@ -46,7 +46,7 @@ async function rehydrate() {
   }
 }
 
-rehydrate();
+const ready = rehydrate();
 
 /** @type {Map<number, Set<chrome.runtime.Port>>} */
 const panelPorts = new Map();
@@ -64,18 +64,15 @@ chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true }).catch(() 
 
 // Drop captures when a tab closes.
 chrome.tabs.onRemoved.addListener((tabId) => {
-  store.dropTab(tabId);
-  markDirty(tabId);
-  broadcast(tabId, { type: 'tab-closed' });
-  panelPorts.delete(tabId);
+  ready.then(() => {
+    store.dropTab(tabId);
+    markDirty(tabId);
+    broadcast(tabId, { type: 'tab-closed', tabId });
+    panelPorts.delete(tabId);
+  });
 });
 
-// Receive page-world messages forwarded by content.js
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (!msg || msg.kind !== 'page-message') return;
-  const tabId = sender?.tab?.id;
-  if (typeof tabId !== 'number') return;
-
+function handlePageMessage(tabId, msg) {
   if (msg.type === 'event') {
     const r = store.appendEvent(tabId, msg.payload);
     markDirty(tabId);
@@ -94,72 +91,74 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     markDirty(tabId);
     broadcast(tabId, { type: 'detection-updated', tabId, payload: msg.payload });
   }
+}
+
+// Receive page-world messages forwarded by content.js
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (!msg || msg.kind !== 'page-message') return;
+  const tabId = sender?.tab?.id;
+  if (typeof tabId !== 'number') return;
+  ready.then(() => handlePageMessage(tabId, msg));
 });
 
 // Side panel connects via long-lived port to receive live updates.
+// Its periodic 'ping' messages need no reply; receiving them keeps this worker alive.
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'acdl-debugger-sidepanel') return;
 
   let subscribedTabId = null;
+  let disconnected = false;
 
   port.onMessage.addListener((msg) => {
-    if (msg.type === 'subscribe') {
-      if (subscribedTabId !== null) {
-        panelPorts.get(subscribedTabId)?.delete(port);
-      }
+    if (msg.type !== 'subscribe') return;
+    ready.then(() => {
+      if (disconnected) return;
+      if (subscribedTabId !== null) panelPorts.get(subscribedTabId)?.delete(port);
       subscribedTabId = msg.tabId;
       if (!panelPorts.has(subscribedTabId)) panelPorts.set(subscribedTabId, new Set());
       panelPorts.get(subscribedTabId).add(port);
       port.postMessage({ type: 'snapshot', tabId: subscribedTabId, capture: store.getCapture(subscribedTabId) || null });
-    }
+    });
   });
 
   port.onDisconnect.addListener(() => {
-    if (subscribedTabId !== null) {
-      panelPorts.get(subscribedTabId)?.delete(port);
-    }
+    disconnected = true;
+    if (subscribedTabId !== null) panelPorts.get(subscribedTabId)?.delete(port);
   });
 });
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (!msg) return;
-
-  if (msg.type === 'clear') {
-    const { tabId } = msg;
+const requestHandlers = {
+  clear({ tabId }) {
     store.clearTab(tabId);
     markDirty(tabId);
     broadcast(tabId, { type: 'cleared', tabId });
-    sendResponse({ ok: true });
-    return true;
-  }
+    return { ok: true };
+  },
 
-  if (msg.type === 'annotate') {
-    const { tabId, seq, label, note } = msg;
+  annotate({ tabId, seq, label, note }) {
     const result = store.setAnnotation(tabId, seq, { label, note });
-    if (!result) {
-      sendResponse({ ok: false, error: 'not-found' });
-      return true;
-    }
+    if (!result) return { ok: false, error: 'not-found' };
     markDirty(tabId);
     broadcast(tabId, { type: 'annotation-updated', tabId, seq, annotation: result.removed ? null : result });
-    sendResponse({ ok: true });
-    return true;
-  }
+    return { ok: true };
+  },
 
-  if (msg.type === 'export') {
-    const { tabId } = msg;
+  export({ tabId }) {
     const cap = store.getCapture(tabId);
-    if (!cap) {
-      sendResponse({ ok: false, error: 'no-capture' });
-      return true;
-    }
+    if (!cap) return { ok: false, error: 'no-capture' };
     const envelope = buildExportEnvelope({
       capture: cap,
       extensionVersion: chrome.runtime.getManifest().version,
       userAgent: navigator.userAgent,
       exportedAt: new Date().toISOString()
     });
-    sendResponse({ ok: true, envelope });
-    return true;
+    return { ok: true, envelope };
   }
+};
+
+// Requests from the side panel. Page-forwarded messages are ignored: pages can post arbitrary types.
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || msg.kind === 'page-message' || !Object.hasOwn(requestHandlers, msg.type)) return;
+  ready.then(() => sendResponse(requestHandlers[msg.type](msg)));
+  return true;
 });
