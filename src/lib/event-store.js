@@ -37,12 +37,12 @@ export function createEventStore({ maxEventsPerTab = 5000, trimChunk = 1000 } = 
       cap.pages.push(pageLoad);
     },
 
-    setAnnotation(tabId, seq, { label = '', note = '' } = {}, now = new Date().toISOString()) {
+    setAnnotation(tabId, seq, { label, note } = {}, now = new Date().toISOString()) {
       const event = tabs.get(tabId)?.events.find(e => e.seq === seq);
       if (!event) return null;
       const clean = {
-        label: label.trim().slice(0, MAX_LABEL_LENGTH),
-        note: note.trim().slice(0, MAX_NOTE_LENGTH)
+        label: String(label ?? '').trim().slice(0, MAX_LABEL_LENGTH),
+        note: String(note ?? '').trim().slice(0, MAX_NOTE_LENGTH)
       };
       if (!clean.label && !clean.note) {
         delete event.annotation;

@@ -156,4 +156,10 @@ describe('eventStore', () => {
     expect(store.getCapture(7).events.some(e => e.annotation)).toBe(false);
     expect(store.setAnnotation(7, 1, { label: 'x' })).toBeNull();
   });
+
+  it('setAnnotation treats null or non-string fields as text', () => {
+    store.appendEvent(7, evt(1));
+    expect(store.setAnnotation(7, 1, { label: null, note: 42 }, 't')).toEqual({ label: '', note: '42', updatedAt: 't' });
+    expect(store.setAnnotation(7, 1, { label: null, note: null })).toEqual({ removed: true });
+  });
 });
