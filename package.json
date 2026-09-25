@@ -10,7 +10,8 @@
     "build:watch": "node build.mjs --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "version": "node scripts/sync-manifest-version.mjs && git add manifest.json"
   },
   "devDependencies": {
     "esbuild": "^0.20.0",

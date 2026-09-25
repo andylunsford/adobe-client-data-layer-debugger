@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      ZIP_NAME: acdl-debugger-${{ github.ref_name }}.zip
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Check tag matches package.json and manifest.json
+        run: node scripts/check-release-version.mjs "$GITHUB_REF_NAME"
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: Package extension
+        run: cd dist && zip -r -X "../$ZIP_NAME" . -x '*.map'
+
+      - name: Write release notes
+        run: |
+          previous=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          {
+            echo "## Changes"
+            echo
+            git log --no-merges --format='- %s' "${previous:+$previous..}$GITHUB_REF_NAME"
+            if [ -n "$previous" ]; then
+              echo
+              echo "**Full diff:** https://github.com/$GITHUB_REPOSITORY/compare/$previous...$GITHUB_REF_NAME"
+            fi
+            echo
+            echo "## Install"
+            echo
+            echo "Download \`$ZIP_NAME\` below and unzip it. In Chrome, open \`chrome://extensions\`, turn on **Developer mode**, click **Load unpacked**, and select the unzipped folder."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" "$ZIP_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag

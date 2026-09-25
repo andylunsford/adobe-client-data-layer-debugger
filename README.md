@@ -15,8 +15,16 @@ Built for debugging ACDL-instrumented sites.
 
 ## Prerequisites
 
-- **Node.js 18+** and npm
 - **Google Chrome 120+** (or any Chromium browser with Side Panel support)
+- To build from source: **Node.js 20.9+** and npm (CI uses Node 22 — see `.nvmrc`)
+
+## Install (from a release)
+
+1. Download `acdl-debugger-vX.Y.Z.zip` from the [latest release](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) and unzip it
+2. Open `chrome://extensions` and enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked** and select the unzipped folder
+
+To update, replace that folder's contents with the newer release and click the reload icon on the extension's card.
 
 ## Install (from source, unpacked)
 
@@ -63,6 +71,19 @@ npm run icons        # regenerate icons/ from assets/icon-source.png
 
 After editing, run `npm run build` and reload the extension at `chrome://extensions`.
 
+CI (`.github/workflows/ci.yml`) runs the tests and a build on every push to `main` and every pull request.
+
+## Releasing
+
+Releases are built and published by GitHub Actions (`.github/workflows/release.yml`) when a version tag is pushed:
+
+```bash
+npm version minor -m "chore: release v%s"   # or patch / major — bumps package.json + manifest.json, commits, tags
+git push --follow-tags                      # pushes the commit and tag; the workflow publishes the release
+```
+
+The workflow checks that the tag matches the version in `package.json` and `manifest.json`, runs the tests, builds, and attaches `acdl-debugger-vX.Y.Z.zip` to a new GitHub release.
+
 ## Architecture
 
 ```
@@ -85,7 +106,8 @@ See `CLAUDE.md` for the full architecture notes, file layout, and known gotchas.
 manifest.json            # MV3 manifest (copied into dist/)
 build.mjs                # esbuild bundle script
 vitest.config.js         # test config
-scripts/make-icons.mjs   # resizes assets/icon-source.png with sharp
+.github/workflows/       # CI (test + build) and tag-driven releases
+scripts/                 # icon generation + release version helpers
 assets/icon-source.png   # source artwork (not shipped in dist/)
 src/
   inject.js              # page-world entry (self-contained IIFE)

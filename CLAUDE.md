@@ -37,7 +37,13 @@ manifest.json                    # MV3 manifest (copied to dist/)
 package.json                     # esbuild + vitest + sharp devDeps
 build.mjs                        # esbuild bundle script (IIFE format), shared entryPoints
 vitest.config.js                 # node default, jsdom for acdl-hook
+.nvmrc                           # Node version for CI (22)
+.github/workflows/
+  ci.yml                         # test + build on push to main and PRs
+  release.yml                    # on v*.*.* tag: verify version, test, build, zip dist/, GitHub release
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
+scripts/sync-manifest-version.mjs  # npm `version` hook: copies package.json version into manifest.json
+scripts/check-release-version.mjs  # release guard: tag must equal package.json + manifest.json version
 assets/
   icon-source.png                # 1300×1300 source artwork (not shipped in dist/)
 src/
@@ -75,6 +81,15 @@ npm run build:watch
 ```
 
 Load `dist/` as an unpacked extension at `chrome://extensions` (Developer mode on).
+
+## Releasing
+
+```bash
+npm version <patch|minor|major> -m "chore: release v%s"   # bumps package.json + lockfile + manifest.json, commits, tags
+git push --follow-tags                                    # tag push triggers .github/workflows/release.yml
+```
+
+The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z.zip` (contents of `dist/`, no source maps) with notes built from commit subjects since the previous tag. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store publishing is not set up.
 
 ## Implementation conventions
 
