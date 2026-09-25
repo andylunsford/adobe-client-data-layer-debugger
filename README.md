@@ -100,4 +100,4 @@ dist/                    # build output — load this unpacked (git-ignored)
 
 ## License
 
-Internal / unlicensed (`"private": true`).
+Copyright 2026 Andy Lunsford. Licensed under the [Apache License, Version 2.0](LICENSE).
