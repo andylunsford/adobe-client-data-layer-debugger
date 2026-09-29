@@ -22,6 +22,7 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+html.popup { width: 780px; height: 580px; }
 body {
   font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif;
   color: var(--text);

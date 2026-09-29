@@ -1,3 +1,4 @@
+import { ext } from '../ext.js';
 import { createPanelConnection } from '../lib/panel-connection.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from '../lib/theme.js';
 
@@ -73,7 +74,7 @@ async function flushSave() {
   const previous = lastSaved;
   lastSaved = values;
   try {
-    const resp = await chrome.runtime.sendMessage({ type: 'annotate', tabId, seq, ...values });
+    const resp = await ext.runtime.sendMessage({ type: 'annotate', tabId, seq, ...values });
     if (!resp?.ok) setStatus('Event no longer in capture.');
   } catch {
     setStatus('Annotation save failed — edit again to retry.');
@@ -280,12 +281,12 @@ els.tabs.forEach((btn) => {
 
 els.clear.addEventListener('click', async () => {
   if (activeTabId === null) return;
-  await chrome.runtime.sendMessage({ type: 'clear', tabId: activeTabId });
+  await ext.runtime.sendMessage({ type: 'clear', tabId: activeTabId });
 });
 
 els.export.addEventListener('click', async () => {
   if (activeTabId === null) return;
-  const resp = await chrome.runtime.sendMessage({ type: 'export', tabId: activeTabId });
+  const resp = await ext.runtime.sendMessage({ type: 'export', tabId: activeTabId });
   if (!resp || !resp.ok) {
     setStatus('Nothing to export.');
     return;
@@ -294,11 +295,15 @@ els.export.addEventListener('click', async () => {
   const url = URL.createObjectURL(blob);
   const host = safeHostFromCapture(resp.envelope) || 'capture';
   const stamp = resp.envelope.exportedAt.replace(/[:.]/g, '-');
-  await chrome.downloads.download({
-    url,
-    filename: `acdl-capture-${host}-${stamp}.json`,
-    saveAs: true
-  });
+  const filename = `acdl-capture-${host}-${stamp}.json`;
+  if (ext.downloads) {
+    await ext.downloads.download({ url, filename, saveAs: true });
+  } else {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 });
 
@@ -331,14 +336,14 @@ renderThemeButton();
 async function init() {
   connection = createPanelConnection({
     connect: () => {
-      const port = chrome.runtime.connect({ name: 'acdl-debugger-sidepanel' });
-      port.onDisconnect.addListener(() => void chrome.runtime.lastError);
+      const port = ext.runtime.connect({ name: 'acdl-debugger-sidepanel' });
+      port.onDisconnect.addListener(() => void ext.runtime.lastError);
       return port;
     },
     onMessage: handleMessage,
     onReconnecting: () => setStatus('Reconnecting…')
   });
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
   if (!tab) {
     setStatus('No active tab.');
     return;
@@ -348,7 +353,7 @@ async function init() {
   connection.subscribe(activeTabId);
 }
 
-chrome.tabs.onActivated.addListener((info) => {
+ext.tabs.onActivated.addListener((info) => {
   if (panelWindowId !== null && info.windowId !== panelWindowId) return;
   flushSave();
   activeTabId = info.tabId;

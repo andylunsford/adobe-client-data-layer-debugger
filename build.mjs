@@ -1,9 +1,12 @@
 import { build, context } from 'esbuild';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { TARGETS, manifestForTarget } from './src/lib/target-manifest.js';
 
 const watch = process.argv.includes('--watch');
-const outdir = 'dist';
+const targetArg = process.argv.find(a => a.startsWith('--target='))?.slice('--target='.length);
+const targets = targetArg ? [targetArg] : watch ? ['chrome'] : TARGETS;
+if (targets.some(t => !TARGETS.includes(t))) throw new Error(`--target must be one of: ${TARGETS.join(', ')}`);
 
 const entryPoints = {
   'inject':              'src/inject.js',
@@ -13,33 +16,45 @@ const entryPoints = {
   'sidepanel/theme':     'src/sidepanel/theme.js'
 };
 
-async function buildAll() {
-  await rm(outdir, { recursive: true, force: true });
-  await mkdir(outdir, { recursive: true });
+const esbuildTarget = { chrome: 'chrome120', firefox: 'firefox140', safari: 'safari17' };
 
-  await build({
-    entryPoints,
-    outdir,
-    bundle: true,
-    format: 'iife',
-    target: 'chrome120',
-    sourcemap: true,
-    logLevel: 'info'
-  });
+const esbuildOptions = (target) => ({
+  entryPoints,
+  outdir: `dist/${target}`,
+  bundle: true,
+  format: 'iife',
+  target: esbuildTarget[target],
+  sourcemap: true,
+  logLevel: 'info'
+});
 
-  await cp('manifest.json', `${outdir}/manifest.json`);
-  await cp('src/sidepanel/index.html', `${outdir}/sidepanel/index.html`);
+async function copyStatic(target) {
+  const outdir = `dist/${target}`;
+  const base = JSON.parse(await readFile('manifest.json', 'utf8'));
+  await writeFile(`${outdir}/manifest.json`, JSON.stringify(manifestForTarget(base, target), null, 2) + '\n');
+  const html = await readFile('src/sidepanel/index.html', 'utf8');
+  await writeFile(`${outdir}/sidepanel/index.html`, html);
+  if (target === 'safari') {
+    await writeFile(`${outdir}/sidepanel/popup.html`, html.replace('<html lang="en">', '<html lang="en" class="popup">'));
+  }
   await cp('src/sidepanel/sidepanel.css', `${outdir}/sidepanel/sidepanel.css`);
   if (existsSync('icons')) await cp('icons', `${outdir}/icons`, { recursive: true });
 }
 
+async function buildTarget(target) {
+  await rm(`dist/${target}`, { recursive: true, force: true });
+  await mkdir(`dist/${target}`, { recursive: true });
+  await build(esbuildOptions(target));
+  await copyStatic(target);
+}
+
 if (watch) {
-  const ctx = await context({
-    entryPoints,
-    outdir, bundle: true, format: 'iife', target: 'chrome120', sourcemap: true, logLevel: 'info'
-  });
+  const [target] = targets;
+  await mkdir(`dist/${target}/sidepanel`, { recursive: true });
+  await copyStatic(target);
+  const ctx = await context(esbuildOptions(target));
   await ctx.watch();
-  console.log('esbuild watching…');
+  console.log(`esbuild watching (${target})…`);
 } else {
-  await buildAll();
+  for (const target of targets) await buildTarget(target);
 }

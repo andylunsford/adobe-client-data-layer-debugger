@@ -11,7 +11,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      ZIP_NAME: acdl-debugger-${{ github.ref_name }}.zip
+      ZIP_PREFIX: acdl-debugger-${{ github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,7 +30,10 @@ jobs:
       - run: npm run build
 
       - name: Package extension
-        run: cd dist && zip -r -X "../$ZIP_NAME" . -x '*.map'
+        run: |
+          for target in chrome firefox safari; do
+            (cd "dist/$target" && zip -r -X "../../$ZIP_PREFIX-$target.zip" . -x '*.map')
+          done
 
       - name: Write release notes
         run: |
@@ -46,7 +49,9 @@ jobs:
             echo
             echo "## Install"
             echo
-            echo "Download \`$ZIP_NAME\` below and unzip it. In Chrome, open \`chrome://extensions\`, turn on **Developer mode**, click **Load unpacked**, and select the unzipped folder."
+            echo "- **Chrome:** download \`$ZIP_PREFIX-chrome.zip\` and unzip it. Open \`chrome://extensions\`, turn on **Developer mode**, click **Load unpacked**, and select the unzipped folder."
+            echo "- **Firefox:** \`$ZIP_PREFIX-firefox.zip\` is the package to upload to addons.mozilla.org. To try it unsigned, open \`about:debugging#/runtime/this-firefox\`, click **Load Temporary Add-on**, and pick the zip."
+            echo "- **Safari:** \`$ZIP_PREFIX-safari.zip\` is the web-extension folder for Xcode. Unzip it on a Mac and run \`xcrun safari-web-extension-converter\` on it (see the README)."
           } > release-notes.md
           cat release-notes.md
 
@@ -54,4 +59,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "$GITHUB_REF_NAME" "$ZIP_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" "$ZIP_PREFIX"-*.zip --title "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag

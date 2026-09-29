@@ -1,3 +1,4 @@
+import { ext } from './ext.js';
 import { createEventStore } from './lib/event-store.js';
 import { buildExportEnvelope } from './lib/export-envelope.js';
 
@@ -26,8 +27,8 @@ async function flushDirty() {
     else removeKeys.push(`${STORAGE_KEY_PREFIX}${tabId}`);
   }
   try {
-    if (Object.keys(items).length) await chrome.storage.session.set(items);
-    if (removeKeys.length) await chrome.storage.session.remove(removeKeys);
+    if (Object.keys(items).length) await ext.storage.session.set(items);
+    if (removeKeys.length) await ext.storage.session.remove(removeKeys);
   } catch (e) {
     console.warn('[acdl-debugger] session storage flush failed', e);
   }
@@ -35,7 +36,7 @@ async function flushDirty() {
 
 async function rehydrate() {
   try {
-    const all = await chrome.storage.session.get(null);
+    const all = await ext.storage.session.get(null);
     for (const [key, value] of Object.entries(all)) {
       if (!key.startsWith(STORAGE_KEY_PREFIX)) continue;
       const tabId = Number(key.slice(STORAGE_KEY_PREFIX.length));
@@ -59,11 +60,12 @@ function broadcast(tabId, msg) {
   }
 }
 
-// Allow opening side panel by clicking the toolbar action.
-chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true }).catch(() => {});
+// Toolbar action opens the panel: Chrome side panel, Firefox sidebar (Safari uses a popup).
+ext.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true }).catch(() => {});
+if (ext.sidebarAction) ext.action.onClicked.addListener(() => ext.sidebarAction.toggle());
 
 // Drop captures when a tab closes.
-chrome.tabs.onRemoved.addListener((tabId) => {
+ext.tabs.onRemoved.addListener((tabId) => {
   ready.then(() => {
     store.dropTab(tabId);
     markDirty(tabId);
@@ -94,7 +96,7 @@ function handlePageMessage(tabId, msg) {
 }
 
 // Receive page-world messages forwarded by content.js
-chrome.runtime.onMessage.addListener((msg, sender) => {
+ext.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.kind !== 'page-message') return;
   const tabId = sender?.tab?.id;
   if (typeof tabId !== 'number') return;
@@ -103,7 +105,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 
 // Side panel connects via long-lived port to receive live updates.
 // Its periodic 'ping' messages need no reply; receiving them keeps this worker alive.
-chrome.runtime.onConnect.addListener((port) => {
+ext.runtime.onConnect.addListener((port) => {
   if (port.name !== 'acdl-debugger-sidepanel') return;
 
   let subscribedTabId = null;
@@ -148,7 +150,7 @@ const requestHandlers = {
     if (!cap) return { ok: false, error: 'no-capture' };
     const envelope = buildExportEnvelope({
       capture: cap,
-      extensionVersion: chrome.runtime.getManifest().version,
+      extensionVersion: ext.runtime.getManifest().version,
       userAgent: navigator.userAgent,
       exportedAt: new Date().toISOString()
     });
@@ -157,7 +159,7 @@ const requestHandlers = {
 };
 
 // Requests from the side panel. Page-forwarded messages are ignored: pages can post arbitrary types.
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.kind === 'page-message' || !Object.hasOwn(requestHandlers, msg.type)) return;
   ready.then(() => sendResponse(requestHandlers[msg.type](msg)));
   return true;
