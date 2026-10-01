@@ -3,8 +3,7 @@
   "name": "Adobe Client Data Layer Debugger",
   "version": "0.3.0",
   "description": "Capture and inspect every push to window.adobeDataLayer with full state snapshots.",
-  "permissions": ["storage", "tabs", "webNavigation", "sidePanel", "downloads"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["storage", "sidePanel", "downloads"],
   "background": { "service_worker": "background.js" },
   "action": {
     "default_title": "Adobe Data Layer Debugger",
