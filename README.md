@@ -4,6 +4,8 @@ A Chrome (Manifest V3) extension that passively captures every push to `window.a
 
 Built for debugging ACDL-instrumented sites.
 
+![Side panel showing captured events and a state snapshot](screenshots/store/full-state-preview-1280x800.png)
+
 ## Features
 
 - Captures every `adobeDataLayer.push(...)` with a deep-cloned state snapshot per event
