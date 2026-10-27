@@ -66,8 +66,7 @@ async function main() {
     }
     try {
       const result = await run();
-      console.log(`${name}: OK`);
-      for (const [k, v] of Object.entries(result)) console.log(`  ${k}: ${v}`);
+      console.log(`::notice::${name}: OK; ${Object.entries(result).map(([k, v]) => `${k}: ${v}`).join('; ')}`);
     } catch (e) {
       failed = true;
       console.log(`::error::${name}: ${e.message}`);
