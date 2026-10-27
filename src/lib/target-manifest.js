@@ -1,6 +1,6 @@
 export const TARGETS = ['chrome', 'firefox', 'safari'];
 
-const GECKO_ID = 'acdl-debugger@andylunsford';
+const GECKO_ID = 'developer@acdl-debugger.com';
 
 function withoutSidePanel(base, dropPermissions = []) {
   const m = structuredClone(base);
