@@ -4,7 +4,7 @@ AI assistant instructions for this project. Inherits parent `CLAUDE.md` style: c
 
 ## Purpose
 
-Manifest V3 Chrome extension that passively captures every push to `window.adobeDataLayer`, deep-clones `getState()` per push, surfaces the timeline in a Chrome **Side Panel**, and exports it as a self-describing JSON file. Goal is debugging ACDL-instrumented sites.
+Manifest V3 browser extension (Chrome, Firefox, Safari) that passively captures every push to `window.adobeDataLayer`, deep-clones `getState()` per push, surfaces the timeline in a panel (Chrome Side Panel / Firefox sidebar / Safari popup), and exports it as a self-describing JSON file. Goal is debugging ACDL-instrumented sites.
 
 ## Source of truth
 
@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.3.0).** All four pieces and seven lib modules are built; 50 unit tests pass (`npm test`). `npm run build` produces a loadable `dist/`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon.
+**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 62 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
 
 Next work is v0.3+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -33,14 +33,15 @@ inject.js          ──▶    content.js      ──▶   background.js  ◀�
 ## File layout
 
 ```
-manifest.json                    # MV3 manifest (copied to dist/)
+manifest.json                    # MV3 manifest for Chrome; Firefox/Safari derived by target-manifest.js
 package.json                     # esbuild + vitest + sharp devDeps
-build.mjs                        # esbuild bundle script (IIFE format), shared entryPoints
+build.mjs                        # esbuild bundle script (IIFE format), one dist/<target> per browser
 vitest.config.js                 # node default, jsdom for acdl-hook
+vitest.e2e.config.js             # e2e only: tests/e2e/**/*.e2e.js, 60 s timeouts, serial
 .nvmrc                           # Node version for CI (22)
 .github/workflows/
-  ci.yml                         # test + build on push to main and PRs
-  release.yml                    # on v*.*.* tag: verify version, test, build, zip dist/, GitHub release
+  ci.yml                         # test + build + web-ext lint (Firefox) on push to main and PRs
+  release.yml                    # on v*.*.* tag: verify version, test, build, zip each dist/<target>, GitHub release
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
 scripts/sync-manifest-version.mjs  # npm `version` hook: copies package.json version into manifest.json
 scripts/check-release-version.mjs  # release guard: tag must equal package.json + manifest.json version
@@ -49,7 +50,8 @@ assets/
 src/
   inject.js                      # page-world entry (must be self-contained IIFE)
   content.js                     # isolated-world bridge
-  background.js                  # service worker
+  background.js                  # service worker (Firefox: event page via background.scripts)
+  ext.js                         # `browser ?? chrome` namespace shim used by all entry files
   lib/
     safe-clone.js                # structuredClone + JSON fallback w/ markers
     ids.js                       # makePageLoadId() → "pl_<10-hex>"
@@ -58,15 +60,17 @@ src/
     acdl-hook.js                 # installs ACDL listeners onto a given object
     panel-connection.js          # single port, heartbeat, reconnect/backoff
     theme.js                     # normalize/next/load/save/apply theme
+    target-manifest.js           # derives firefox/safari manifests from manifest.json
   sidepanel/
-    index.html
+    index.html                   # build also emits popup.html (class="popup") for Safari
     sidepanel.js
     sidepanel.css
     theme.js                     # head script: applies stored theme before paint
 tests/                           # vitest, one file per lib module
+  e2e/                           # real-browser tests: fixture-server, browsers (launchers), extension.e2e.js
 icons/                           # generated by make-icons (committed)
 screenshots/                     # raw captures; store/ = 1280×800 Web Store uploads
-dist/                            # build output — load this into Chrome unpacked
+dist/<chrome|firefox|safari>/    # build output — load unpacked
 ```
 
 All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node without Chrome APIs.
@@ -76,12 +80,13 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 ```bash
 npm install
 npm run icons      # regenerate icons from assets/icon-source.png
-npm run build      # produces ./dist
-npm test           # 50 unit tests across 7 lib modules
-npm run build:watch
+npm run build      # produces dist/chrome, dist/firefox, dist/safari (--target=<name> for one)
+npm test           # 62 unit tests across 8 lib modules
+npm run build:watch  # dist/chrome only unless -- --target=<name>
+npm run test:e2e   # builds, then runs tests/e2e in headless Chromium + Firefox (needs Firefox installed)
 ```
 
-Load `dist/` as an unpacked extension at `chrome://extensions` (Developer mode on).
+Chrome: load `dist/chrome` unpacked at `chrome://extensions`. Firefox: `about:debugging` → Load Temporary Add-on → `dist/firefox/manifest.json`. Safari: `xcrun safari-web-extension-converter dist/safari` on macOS (see README).
 
 ## Releasing
 
@@ -90,14 +95,14 @@ npm version <patch|minor|major> -m "chore: release v%s"   # bumps package.json +
 git push --follow-tags                                    # tag push triggers .github/workflows/release.yml
 ```
 
-The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z.zip` (contents of `dist/`, no source maps) with notes built from commit subjects since the previous tag. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store publishing is not set up.
+The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store, AMO, and App Store publishing are not set up.
 
 ## Implementation conventions
 
 - **TDD.** Lib modules (`src/lib/`) follow strict red→green→commit. Don't add behavior without a failing test first.
 - **No runtime framework.** Vanilla JS + CSS for the side panel. Preact is the v2 upgrade path if complexity grows.
 - **No bundler tricks.** esbuild emits IIFE bundles targeting `chrome120`. `inject.js` MUST be self-contained — page-world cannot import.
-- **Pure modules under `src/lib/`** — no Chrome API references. Entry files (`inject.js`, `content.js`, `background.js`, `sidepanel.js`) are the only places that touch `chrome.*` or `window.*`.
+- **Pure modules under `src/lib/`** — no Chrome API references. Entry files (`inject.js`, `content.js`, `background.js`, `sidepanel.js`) are the only places that touch extension APIs or `window.*`, and they go through `ext` from `src/ext.js`, never `chrome.*` directly.
 - **Minimize comments** (per parent CLAUDE.md). Self-documenting code preferred.
 
 ## Known gotchas
@@ -113,9 +118,13 @@ The release workflow fails fast if the tag doesn't match both versions. It publi
 - **Permissions are minimal for Web Store review:** `storage` (session persistence), `sidePanel`, `downloads` (Export). No `host_permissions` — the `<all_urls>` content script grants its own access. `tabs`/`webNavigation` were dropped as unused (tab IDs and `onActivated`/`onRemoved` need no permission). Re-add only with a real call site, and update `PRIVACY.md` + store justifications.
 - **`seq` vs `index`:** `index` is per page load (assigned in `inject.js`, restarts at 1). `seq` is tab-wide and assigned by `event-store`; the side panel and `annotate` message key on `seq`.
 
+- **Cross-browser:** `manifest.json` stays Chrome-shaped; per-browser differences live in `src/lib/target-manifest.js` (tested). Firefox: `background.scripts` (no MV3 service workers), `sidebar_action` instead of `side_panel` (action click → `sidebarAction.toggle()` in background.js), gecko id `acdl-debugger@andylunsford` (permanent once on AMO), `data_collection_permissions: none` (required by AMO for new add-ons). Safari: no side panel/sidebar API → action `default_popup` = `sidepanel/popup.html`; no `downloads` API → Export falls back to an `<a download>` click. Guard any new API with optional chaining if it isn't in all three.
+
+- **E2E harness:** Chromium via Playwright (`channel: 'chromium'`; branded Chrome 137+ ignores `--load-extension`), pinned to 1.56.1 to match the browsers preinstalled in Claude cloud sessions; bump both together. The CI `e2e` job runs on `ubuntu-24.04` because 1.56 refuses to install Chromium on Ubuntu 26.04 (`ubuntu-latest`); move it to `ubuntu-latest` only after a Playwright upgrade. Firefox via `puppeteer-core` over WebDriver BiDi, using the system Firefox (`FIREFOX_BIN` overrides). Firefox needs system access to open and script `moz-extension://` pages: `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` (Firefox 159+, which dropped the flag) plus `-remote-allow-system-access` (older releases); CI installs the latest Firefox, so a harness break there may be a Firefox change rather than an extension bug, and BiDi never reports their load event, so `openPanel()` polls instead of awaiting `goto`. The moz-extension UUID is fixed via the `extensions.webextensions.uuids` pref. Tests find a tab's capture by exporting every tab and matching `pages[].url`, so give each test its own query string. The "no ACDL" path is not covered (detection waits 5 s).
+
 ## Out of scope (v1)
 
-Cross-origin iframe ACDL capture · search/filter · state diffs · replay · Puppeteer/Playwright E2E · annotating page dividers · exempting annotated events from trim. All deferred to v0.3+.
+Cross-origin iframe ACDL capture · search/filter · state diffs · replay · annotating page dividers · exempting annotated events from trim. All deferred to v0.3+.
 
 ## Manual smoke test sites
 
