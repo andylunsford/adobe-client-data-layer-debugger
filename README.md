@@ -89,7 +89,7 @@ All non-trivial logic lives in `src/lib/` as pure modules (no extension APIs) so
 
 ```bash
 npm install          # install dev dependencies (esbuild, vitest, jsdom, sharp)
-npm test             # run unit tests (71 tests: 8 lib modules + the Web Store publisher)
+npm test             # run unit tests (78 tests: 8 lib modules + the store scripts)
 npm run test:watch   # re-run tests on change
 npm run test:e2e     # build, then run real-browser tests in headless Chromium + Firefox
 npm run build        # one-off bundle into dist/<chrome|firefox|safari>
@@ -133,6 +133,8 @@ In parallel, the workflow submits the release's `-chrome.zip` to the Chrome Web 
 3. In the repo's **Settings → Secrets and variables → Actions**, add the secret `CWS_SERVICE_ACCOUNT_KEY` (the whole JSON key file) and the variables `CWS_PUBLISHER_ID` (Dashboard → Publisher → Settings) and `CWS_EXTENSION_ID` (the item ID in the store URL).
 
 Without them the job logs a warning and skips. Publishing to the App Store is manual.
+
+To check all store credentials without releasing, run **Actions → Validate store credentials → Run workflow**. It is read-only: it loads your AMO profile and looks up the add-on ID, then gets a Chrome Web Store token and reads the item's status. Nothing is uploaded or submitted.
 
 ## Architecture
 

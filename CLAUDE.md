@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 71 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
+**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 78 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
 
 Next work is v0.3+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -41,11 +41,13 @@ vitest.e2e.config.js             # e2e only: tests/e2e/**/*.e2e.js, 60 s timeout
 .nvmrc                           # Node version for CI (22)
 .github/workflows/
   ci.yml                         # test + build + web-ext lint (Firefox) on push to main and PRs
+  validate-credentials.yml       # manual (or on change): read-only check of AMO + CWS secrets/variables
   release.yml                    # on v*.*.* tag: verify, test, build, zip each dist/<target>, GitHub release; then Chrome Web Store submit + AMO signing jobs
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
 scripts/sync-manifest-version.mjs  # npm `version` hook: copies package.json version into manifest.json
 scripts/check-release-version.mjs  # release guard: tag must equal package.json + manifest.json version
 scripts/chrome-web-store.mjs     # CWS API v2: service-account JWT → token, upload zip, poll, publish (tested)
+scripts/check-store-credentials.mjs  # read-only: AMO profile + add-on ID lookup, CWS token + fetchStatus (tested)
 assets/
   icon-source.png                # 1300×1300 source artwork (not shipped in dist/)
 src/
@@ -82,7 +84,7 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 npm install
 npm run icons      # regenerate icons from assets/icon-source.png
 npm run build      # produces dist/chrome, dist/firefox, dist/safari (--target=<name> for one)
-npm test           # 71 unit tests: 8 lib modules + chrome-web-store script
+npm test           # 78 unit tests: 8 lib modules + store scripts
 npm run build:watch  # dist/chrome only unless -- --target=<name>
 npm run test:e2e   # builds, then runs tests/e2e in headless Chromium + Firefox (needs Firefox installed)
 ```

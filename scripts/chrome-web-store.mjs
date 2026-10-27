@@ -39,6 +39,13 @@ export async function accessToken(key, fetchImpl = fetch) {
   return json.access_token;
 }
 
+export function fetchItemStatus({ token, publisherId, extensionId, fetchImpl = fetch }) {
+  return request(fetchImpl, 'fetchStatus', `${API}/v2/publishers/${publisherId}/items/${extensionId}:fetchStatus`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 export async function publishPackage({ token, publisherId, extensionId, zip, fetchImpl = fetch, pollMs = 5000, maxPolls = 60 }) {
   const item = `publishers/${publisherId}/items/${extensionId}`;
   const auth = { Authorization: `Bearer ${token}` };
@@ -48,7 +55,7 @@ export async function publishPackage({ token, publisherId, extensionId, zip, fet
   for (let polls = 0; IN_PROGRESS.has(state); polls++) {
     if (polls >= maxPolls) throw new Error(`upload still ${state} after ${maxPolls} polls`);
     await new Promise(r => setTimeout(r, pollMs));
-    state = (await request(fetchImpl, 'fetchStatus', `${API}/v2/${item}:fetchStatus`, { method: 'GET', headers: auth })).lastAsyncUploadState;
+    state = (await fetchItemStatus({ token, publisherId, extensionId, fetchImpl })).lastAsyncUploadState;
   }
   if (state !== 'SUCCEEDED') throw new Error(`upload ${state}: ${JSON.stringify(upload)}`);
 
