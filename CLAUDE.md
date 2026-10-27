@@ -95,7 +95,7 @@ npm version <patch|minor|major> -m "chore: release v%s"   # bumps package.json +
 git push --follow-tags                                    # tag push triggers .github/workflows/release.yml
 ```
 
-The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store, AMO, and App Store publishing are not set up.
+The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag, then signs `dist/firefox` on AMO's unlisted channel (`web-ext sign`, source = `git archive` of the tag, 20 min approval wait) and uploads `-firefox.xpi` to the release. Signing needs repo secrets `AMO_JWT_ISSUER`/`AMO_JWT_SECRET`; without them the step warns and skips. AMO rejects a version it has already seen, so a failed signing run needs a version bump, not a re-run. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store, listed AMO, and App Store publishing are not set up; stable Chrome only installs off-store extensions via Load unpacked or enterprise policy.
 
 ## Implementation conventions
 
