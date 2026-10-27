@@ -89,7 +89,7 @@ All non-trivial logic lives in `src/lib/` as pure modules (no extension APIs) so
 
 ```bash
 npm install          # install dev dependencies (esbuild, vitest, jsdom, sharp)
-npm test             # run unit tests (62 tests across 8 lib modules)
+npm test             # run unit tests (71 tests: 8 lib modules + the Web Store publisher)
 npm run test:watch   # re-run tests on change
 npm run test:e2e     # build, then run real-browser tests in headless Chromium + Firefox
 npm run build        # one-off bundle into dist/<chrome|firefox|safari>
@@ -124,7 +124,15 @@ The workflow checks that the tag matches the version in `package.json` and `mani
 
 **One-time setup for signing:** create API credentials at [addons.mozilla.org/developers/addon/api/key](https://addons.mozilla.org/developers/addon/api/key/), then add them as repository secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` (**Settings → Secrets and variables → Actions**). Without them, releases still publish and the job logs a warning that no `.xpi` was signed. The first signed upload registers the add-on ID `developer@acdl-debugger.com` to your AMO account permanently.
 
-Chrome has no equivalent: stable Chrome on Windows and macOS only installs extensions from the Chrome Web Store (or by enterprise policy), so outside the store the `-chrome.zip` is loaded with **Load unpacked**. Publishing to the Chrome Web Store and the App Store is manual.
+In parallel, the workflow submits the release's `-chrome.zip` to the Chrome Web Store (`scripts/chrome-web-store.mjs`, Chrome Web Store API v2). Google reviews it and publishes automatically once approved, using the visibility set in the dashboard. The store requires a higher `version` than the last upload, which the tag check already enforces. Stable Chrome only installs extensions from the store (or by enterprise policy), so the `-chrome.zip` on the release is for **Load unpacked**.
+
+**One-time setup for Chrome Web Store publishing:**
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), pick or create a project, enable the **Chrome Web Store API**, and create a service account (it needs no IAM roles). Create a **JSON key** for it.
+2. In the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole), add the service account's email under **Account** (one service account per publisher). 2-step verification must be on for your Google account.
+3. In the repo's **Settings → Secrets and variables → Actions**, add the secret `CWS_SERVICE_ACCOUNT_KEY` (the whole JSON key file) and the variables `CWS_PUBLISHER_ID` (Dashboard → Publisher → Settings) and `CWS_EXTENSION_ID` (the item ID in the store URL).
+
+Without them the job logs a warning and skips. Publishing to the App Store is manual.
 
 ## Architecture
 

@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 62 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
+**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 71 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
 
 Next work is v0.3+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -41,10 +41,11 @@ vitest.e2e.config.js             # e2e only: tests/e2e/**/*.e2e.js, 60 s timeout
 .nvmrc                           # Node version for CI (22)
 .github/workflows/
   ci.yml                         # test + build + web-ext lint (Firefox) on push to main and PRs
-  release.yml                    # on v*.*.* tag: verify version, test, build, zip each dist/<target>, GitHub release
+  release.yml                    # on v*.*.* tag: verify, test, build, zip each dist/<target>, GitHub release; then Chrome Web Store submit + AMO signing jobs
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
 scripts/sync-manifest-version.mjs  # npm `version` hook: copies package.json version into manifest.json
 scripts/check-release-version.mjs  # release guard: tag must equal package.json + manifest.json version
+scripts/chrome-web-store.mjs     # CWS API v2: service-account JWT → token, upload zip, poll, publish (tested)
 assets/
   icon-source.png                # 1300×1300 source artwork (not shipped in dist/)
 src/
@@ -81,7 +82,7 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 npm install
 npm run icons      # regenerate icons from assets/icon-source.png
 npm run build      # produces dist/chrome, dist/firefox, dist/safari (--target=<name> for one)
-npm test           # 62 unit tests across 8 lib modules
+npm test           # 71 unit tests: 8 lib modules + chrome-web-store script
 npm run build:watch  # dist/chrome only unless -- --target=<name>
 npm run test:e2e   # builds, then runs tests/e2e in headless Chromium + Firefox (needs Firefox installed)
 ```
@@ -95,7 +96,7 @@ npm version <patch|minor|major> -m "chore: release v%s"   # bumps package.json +
 git push --follow-tags                                    # tag push triggers .github/workflows/release.yml
 ```
 
-The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag, then signs `dist/firefox` on AMO's unlisted channel (`web-ext sign`, source = `git archive` of the tag, 20 min approval wait) and uploads `-firefox.xpi` to the release. Signing needs repo secrets `AMO_JWT_ISSUER`/`AMO_JWT_SECRET`; without them the step warns and skips. AMO rejects a version it has already seen, so a failed signing run needs a version bump, not a re-run. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store, listed AMO, and App Store publishing are not set up; stable Chrome only installs off-store extensions via Load unpacked or enterprise policy.
+The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag, then two jobs act on the release's own zips: `chrome-web-store` submits `-chrome.zip` for review (`scripts/chrome-web-store.mjs`; secret `CWS_SERVICE_ACCOUNT_KEY` = service-account JSON key, variables `CWS_PUBLISHER_ID`/`CWS_EXTENSION_ID`; skips with a warning if unset; store requires a higher version than the last upload), and `firefox-sign` signs the Firefox build on AMO's unlisted channel (`web-ext sign`, source = `git archive` of the tag, 20 min approval wait) and uploads `-firefox.xpi` to the release. Signing needs repo secrets `AMO_JWT_ISSUER`/`AMO_JWT_SECRET`; without them the step warns and skips. AMO rejects a version it has already seen, so a failed signing run needs a version bump, not a re-run. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Listed AMO and App Store publishing are not set up; stable Chrome only installs off-store extensions via Load unpacked or enterprise policy. The CWS v2 docs name the in-progress upload state both `UPLOAD_IN_PROGRESS` and `IN_PROGRESS`; the script accepts either.
 
 ## Implementation conventions
 
