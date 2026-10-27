@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 62 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
+**Implemented (v0.3.0).** All four pieces and eight lib modules are built; 78 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
 
 Next work is v0.3+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -41,10 +41,13 @@ vitest.e2e.config.js             # e2e only: tests/e2e/**/*.e2e.js, 60 s timeout
 .nvmrc                           # Node version for CI (22)
 .github/workflows/
   ci.yml                         # test + build + web-ext lint (Firefox) on push to main and PRs
-  release.yml                    # on v*.*.* tag: verify version, test, build, zip each dist/<target>, GitHub release
+  validate-credentials.yml       # manual (or on change): read-only check of AMO + CWS secrets/variables
+  release.yml                    # on v*.*.* tag: verify, test, build, zip each dist/<target>, GitHub release; then Chrome Web Store submit + AMO signing jobs
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
 scripts/sync-manifest-version.mjs  # npm `version` hook: copies package.json version into manifest.json
 scripts/check-release-version.mjs  # release guard: tag must equal package.json + manifest.json version
+scripts/chrome-web-store.mjs     # CWS API v2: service-account JWT → token, upload zip, poll, publish (tested)
+scripts/check-store-credentials.mjs  # read-only: AMO profile + add-on ID lookup, CWS token + fetchStatus (tested)
 assets/
   icon-source.png                # 1300×1300 source artwork (not shipped in dist/)
 src/
@@ -81,7 +84,7 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 npm install
 npm run icons      # regenerate icons from assets/icon-source.png
 npm run build      # produces dist/chrome, dist/firefox, dist/safari (--target=<name> for one)
-npm test           # 62 unit tests across 8 lib modules
+npm test           # 78 unit tests: 8 lib modules + store scripts
 npm run build:watch  # dist/chrome only unless -- --target=<name>
 npm run test:e2e   # builds, then runs tests/e2e in headless Chromium + Firefox (needs Firefox installed)
 ```
@@ -95,7 +98,7 @@ npm version <patch|minor|major> -m "chore: release v%s"   # bumps package.json +
 git push --follow-tags                                    # tag push triggers .github/workflows/release.yml
 ```
 
-The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Chrome Web Store, AMO, and App Store publishing are not set up.
+The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag, then two jobs act on the release's own zips: `chrome-web-store` submits `-chrome.zip` for review (`scripts/chrome-web-store.mjs`; secret `CWS_SERVICE_ACCOUNT_KEY` = service-account JSON key, variables `CWS_PUBLISHER_ID`/`CWS_EXTENSION_ID`; skips with a warning if unset; store requires a higher version than the last upload), and `firefox-sign` signs the Firefox build on AMO's unlisted channel (`web-ext sign`, source = `git archive` of the tag, 20 min approval wait) and uploads `-firefox.xpi` to the release. Signing needs repo secrets `AMO_JWT_ISSUER`/`AMO_JWT_SECRET`; without them the step warns and skips. AMO rejects a version it has already seen, so a failed signing run needs a version bump, not a re-run. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Listed AMO and App Store publishing are not set up; stable Chrome only installs off-store extensions via Load unpacked or enterprise policy. The CWS v2 docs name the in-progress upload state both `UPLOAD_IN_PROGRESS` and `IN_PROGRESS`; the script accepts either.
 
 ## Implementation conventions
 
@@ -118,7 +121,7 @@ The release workflow fails fast if the tag doesn't match both versions. It publi
 - **Permissions are minimal for Web Store review:** `storage` (session persistence), `sidePanel`, `downloads` (Export). No `host_permissions` — the `<all_urls>` content script grants its own access. `tabs`/`webNavigation` were dropped as unused (tab IDs and `onActivated`/`onRemoved` need no permission). Re-add only with a real call site, and update `PRIVACY.md` + store justifications.
 - **`seq` vs `index`:** `index` is per page load (assigned in `inject.js`, restarts at 1). `seq` is tab-wide and assigned by `event-store`; the side panel and `annotate` message key on `seq`.
 
-- **Cross-browser:** `manifest.json` stays Chrome-shaped; per-browser differences live in `src/lib/target-manifest.js` (tested). Firefox: `background.scripts` (no MV3 service workers), `sidebar_action` instead of `side_panel` (action click → `sidebarAction.toggle()` in background.js), gecko id `acdl-debugger@andylunsford` (permanent once on AMO), `data_collection_permissions: none` (required by AMO for new add-ons). Safari: no side panel/sidebar API → action `default_popup` = `sidepanel/popup.html`; no `downloads` API → Export falls back to an `<a download>` click. Guard any new API with optional chaining if it isn't in all three.
+- **Cross-browser:** `manifest.json` stays Chrome-shaped; per-browser differences live in `src/lib/target-manifest.js` (tested). Firefox: `background.scripts` (no MV3 service workers), `sidebar_action` instead of `side_panel` (action click → `sidebarAction.toggle()` in background.js), gecko id `developer@acdl-debugger.com` (permanent once on AMO), `data_collection_permissions: none` (required by AMO for new add-ons). Safari: no side panel/sidebar API → action `default_popup` = `sidepanel/popup.html`; no `downloads` API → Export falls back to an `<a download>` click. Guard any new API with optional chaining if it isn't in all three.
 
 - **E2E harness:** Chromium via Playwright (`channel: 'chromium'`; branded Chrome 137+ ignores `--load-extension`), pinned to 1.56.1 to match the browsers preinstalled in Claude cloud sessions; bump both together. The CI `e2e` job runs on `ubuntu-24.04` because 1.56 refuses to install Chromium on Ubuntu 26.04 (`ubuntu-latest`); move it to `ubuntu-latest` only after a Playwright upgrade. Firefox via `puppeteer-core` over WebDriver BiDi, using the system Firefox (`FIREFOX_BIN` overrides). Firefox needs system access to open and script `moz-extension://` pages: `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` (Firefox 159+, which dropped the flag) plus `-remote-allow-system-access` (older releases); CI installs the latest Firefox, so a harness break there may be a Firefox change rather than an extension bug, and BiDi never reports their load event, so `openPanel()` polls instead of awaiting `goto`. The moz-extension UUID is fixed via the `extensions.webextensions.uuids` pref. Tests find a tab's capture by exporting every tab and matching `pages[].url`, so give each test its own query string. The "no ACDL" path is not covered (detection waits 5 s).
 

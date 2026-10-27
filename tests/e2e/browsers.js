@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import puppeteer from 'puppeteer-core';
 
 const distDir = (target) => resolve('dist', target);
-const GECKO_ID = 'acdl-debugger@andylunsford';
+const GECKO_ID = 'developer@acdl-debugger.com';
 const FIREFOX_UUID = '7c1d3a52-5b8e-4f43-9d0a-acd1de0bbe90';
 
 async function waitUntil(check, { timeoutMs = 10_000, intervalMs = 100 } = {}) {
