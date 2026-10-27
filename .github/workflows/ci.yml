@@ -26,7 +26,8 @@ jobs:
         run: npx --yes web-ext@10.7.0 lint --source-dir dist/firefox --ignore-files '*.map'
 
   e2e:
-    runs-on: ubuntu-latest
+    # Playwright 1.56 has no Chromium build for Ubuntu 26.04 (ubuntu-latest since Oct 2026).
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
