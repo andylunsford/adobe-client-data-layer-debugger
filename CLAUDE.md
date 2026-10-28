@@ -36,7 +36,7 @@ inject.js          ──▶    content.js      ──▶   background.js  ◀�
 manifest.json                    # MV3 manifest for Chrome; Firefox/Safari derived by target-manifest.js
 package.json                     # esbuild + vitest + sharp devDeps
 build.mjs                        # esbuild bundle script (IIFE format), one dist/<target> per browser
-vitest.config.js                 # node default, jsdom for acdl-hook
+vitest.config.js                 # node default; acdl-hook.test.js opts into jsdom via `// @vitest-environment jsdom`
 vitest.e2e.config.js             # e2e only: tests/e2e/**/*.e2e.js, 60 s timeouts, serial
 .nvmrc                           # Node version for CI (22)
 .github/workflows/

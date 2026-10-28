@@ -20,7 +20,7 @@ Built for debugging ACDL-instrumented sites.
 - **Google Chrome 120+** (or any Chromium browser with Side Panel support)
 - **Firefox 142+** (desktop only — Firefox for Android has no sidebar)
 - **Safari 17.5+** on macOS, plus **Xcode** to wrap the extension in the app Safari requires
-- To build from source: **Node.js 20.9+** and npm (CI uses Node 22 — see `.nvmrc`)
+- To build from source: **Node.js 22.12+** and npm (CI uses Node 22 — see `.nvmrc`)
 
 ## Install (from a release)
 
