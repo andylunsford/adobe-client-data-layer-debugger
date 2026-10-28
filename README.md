@@ -1,6 +1,9 @@
 # Adobe Client Data Layer Debugger
 
-A Manifest V3 browser extension for **Chrome, Firefox and Safari** that passively captures every push to `window.adobeDataLayer`, deep-clones the full `getState()` snapshot per push, surfaces the timeline in a panel (Chrome **Side Panel**, Firefox **Sidebar**, Safari toolbar **popup**), and exports it as a self-describing JSON file for post-recording debugging.
+![Browsers](https://img.shields.io/badge/browsers-Chrome%20%7C%20Firefox%20%7C%20Safari-lightgrey)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/copbbelofncpohiigmpoagkaoflcejlp?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/adobe-client-data-layer-d/copbbelofncpohiigmpoagkaoflcejlp) [![Firefox Add-ons](https://img.shields.io/amo/v/acdl-debugger?label=Firefox%20Add-ons)](https://addons.mozilla.org/en-US/firefox/addon/acdl-debugger/) [![Release](https://img.shields.io/github/v/release/andylunsford/adobe-client-data-layer-debugger)](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) [![CI](https://github.com/andylunsford/adobe-client-data-layer-debugger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andylunsford/adobe-client-data-layer-debugger/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache_2.0-blue)](LICENSE)
+
+A browser extension for **Chrome, Firefox and Safari** that passively captures every push to `window.adobeDataLayer`, deep-clones the full `getState()` snapshot per push, surfaces the timeline in a panel (Chrome **Side Panel**, Firefox **Sidebar**, Safari toolbar **popup**), and exports it as a self-describing JSON file for post-recording debugging.
 
 Built for debugging ACDL-instrumented sites.
 
@@ -10,9 +13,12 @@ Built for debugging ACDL-instrumented sites.
 
 - Captures every `adobeDataLayer.push(...)` with a deep-cloned state snapshot per event
 - Replays events pushed before the extension loaded (`scope: 'all'`)
-- Per-tab timeline — list + detail view
+- Per-tab timeline — list + detail view; captures persist across page navigations in the same tab
+- Watches renamed data layers too — add the names under **Settings** (see below)
+- Label and note any event to record what triggered it; labels and notes are included in exports
 - One-click **Clear** and **Export** (downloads a documented JSON envelope)
 - Survives MV3 background eviction via `storage.session`
+- System, Light, or Dark theme
 - Zero runtime dependencies — vanilla JS + CSS
 
 ## Prerequisites
@@ -22,11 +28,19 @@ Built for debugging ACDL-instrumented sites.
 - **Safari 17.5+** on macOS, plus **Xcode** to wrap the extension in the app Safari requires
 - To build from source: **Node.js 22.12+** and npm (CI uses Node 22 — see `.nvmrc`)
 
-## Install (from a release)
+## Install
 
-Each [release](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) attaches one zip per browser (`acdl-debugger-vX.Y.Z-chrome.zip`, `-firefox.zip`, `-safari.zip`) plus, once AMO signing is set up, a Mozilla-signed `acdl-debugger-vX.Y.Z-firefox.xpi`.
+### Store Links
+- [Chrome](https://chromewebstore.google.com/detail/adobe-client-data-layer-d/copbbelofncpohiigmpoagkaoflcejlp)
+- [Firefox](https://addons.mozilla.org/en-US/firefox/addon/acdl-debugger/)
+- Safari (TBD based on interest)
 
-### Chrome
+
+### Packaged Releases
+
+Each [release](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) attaches one zip per browser: `acdl-debugger-vX.Y.Z-chrome.zip`, `-firefox.zip` and `-safari.zip`. Releases also go to the Chrome Web Store and Firefox Add-ons automatically, and appear there once each store's review approves them, so the store links above are the easiest way to install and stay up to date. The zips are for loading the extension unpacked, for testing or where the stores aren't an option.
+
+#### Chrome
 
 1. Download the `-chrome.zip` and unzip it
 2. Open `chrome://extensions` and enable **Developer mode** (top-right toggle)
@@ -34,16 +48,13 @@ Each [release](https://github.com/andylunsford/adobe-client-data-layer-debugger/
 
 To update, replace that folder's contents with the newer release and click the reload icon on the extension's card.
 
-### Firefox
+#### Firefox
 
-- **Install (signed):** download the release's `-firefox.xpi` and open it in Firefox 142+ (or drag it onto a Firefox window). It stays installed across restarts. Mozilla signs it as *unlisted*: it is not on addons.mozilla.org and won't auto-update, so install each new release's `.xpi` the same way.
+- **Install:** use [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/acdl-debugger/) (Firefox 142+). Firefox only installs Mozilla-signed add-ons permanently, and releases no longer attach a signed `.xpi`.
 - **Try it unsigned:** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick the `-firefox.zip` (or `dist/firefox/manifest.json`). Temporary add-ons are removed when Firefox restarts.
-- **Publish:** upload the `-firefox.zip` at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/). Because the bundles are generated by esbuild, AMO also asks for the source code; upload the release's source archive and point reviewers at `npm ci && npm run build` (output in `dist/firefox`). For a self-distributed signed `.xpi`, submit it as "On your own" instead of "On this site".
 - Click the toolbar button (or **View → Sidebar**) to open the sidebar.
 
-The add-on ID is `developer@acdl-debugger.com` (`src/lib/target-manifest.js`). AMO ties the add-on to it permanently once the first version is signed.
-
-### Safari
+#### Safari
 
 Safari only runs web extensions that ship inside a native macOS app, so the zip is the input to Apple's converter, not something you install directly. On a Mac with Xcode:
 
@@ -55,6 +66,17 @@ xcrun safari-web-extension-converter acdl-safari --macos-only --app-name "ACDL D
 Build and run the generated Xcode project, then enable the extension in **Safari → Settings → Extensions**. To load an unsigned build, first turn on **Develop → Developer Settings → Allow unsigned extensions** (resets each time Safari quits). Grant the extension access to the sites you debug when Safari asks. Distributing to other Macs requires an Apple Developer account (App Store or notarized app).
 
 Safari has no side panel or sidebar API, so the panel opens as a toolbar **popup** and closes when you click back into the page. Capture keeps running in the background; reopen the popup to see new events. Safari has no `downloads` API, so **Export** saves through a regular download link.
+
+## Settings
+
+Click the gear button in the panel header to open **Settings**.
+
+**Data layer names:** the extension always watches `window.adobeDataLayer`. If a site exposes its data layer under another name, add that name here (comma-separated, e.g. `myDataLayer`). This covers a self-hosted or modified ACDL build, or a page that pushes into its own custom-named array. Adobe's Client Data Layer Tags extension can also rename the data layer, but it still creates `adobeDataLayer`, so those sites are usually captured without any setting. Adding the custom name there doesn't hurt: if two names point at the same data layer, each event is captured only once.
+
+- Names must be plain JavaScript identifiers (letters, digits, `_` and `$`), up to 10 extra names.
+- Changes apply to open tabs right away, without a reload. Events pushed before you added the name are still captured.
+- Events from a non-default name show it in the event list (e.g. `#2 · 10:14:03.512 · myDataLayer`), and every exported event includes its `dataLayer` name.
+- Names are stored locally in your browser (see [PRIVACY.md](PRIVACY.md)).
 
 ## Install (from source, unpacked)
 
@@ -79,6 +101,7 @@ The panel always reflects the **active** tab. Switching tabs re-subscribes autom
 
 - **Has ACDL** — visit a site that uses `window.adobeDataLayer`; events appear in the panel.
 - **No ACDL** — visit `https://example.com/`; the panel shows a "not detected" banner.
+- **Renamed layer** — on a page whose data layer only exists as, say, `myDataLayer`, nothing appears until you add `myDataLayer` under **Settings**; then its events appear without reloading.
 - **Trim test** — in the page console: `for (let i = 0; i < 6000; i++) adobeDataLayer.push({ event: 'load.test', n: i })` — the store FIFO-trims at 5000.
 
 ## Contributing / building
@@ -89,7 +112,7 @@ All non-trivial logic lives in `src/lib/` as pure modules (no extension APIs) so
 
 ```bash
 npm install          # install dev dependencies (esbuild, vitest, jsdom, sharp)
-npm test             # run unit tests (84 tests: 9 lib modules + the store scripts)
+npm test             # run unit tests (103 tests: 11 lib modules + the store scripts)
 npm run test:watch   # re-run tests on change
 npm run test:e2e     # build, then run real-browser tests in headless Chromium + Firefox
 npm run build        # one-off bundle into dist/<chrome|firefox|safari>
@@ -109,32 +132,7 @@ After editing, run `npm run build` and reload the extension (`chrome://extension
 
 CI (`.github/workflows/ci.yml`) runs the tests, builds all three targets, runs Mozilla's `web-ext lint` (the AMO validator) on the Firefox build, and runs the e2e suite in Chromium and Firefox on every push to `main` and every pull request.
 
-**E2E tests** (`tests/e2e/`) load the built extension into headless Chromium (Playwright) and Firefox (puppeteer-core over WebDriver BiDi), serve a local page running the real ACDL library, and check that captures, state snapshots, navigation, strict-CSP pages, the panel's event list and Clear all work. Chromium comes from `npx playwright install chromium`. Firefox must be installed on the machine; set `FIREFOX_BIN` if it isn't on `PATH`. Safari isn't covered: it only runs on macOS.
-
-## Releasing
-
-Releases are built and published by GitHub Actions (`.github/workflows/release.yml`) when a version tag is pushed:
-
-```bash
-npm version minor -m "chore: release v%s"   # or patch / major — bumps package.json + manifest.json, commits, tags
-git push --follow-tags                      # pushes the commit and tag; the workflow publishes the release
-```
-
-The workflow checks that the tag matches the version in `package.json` and `manifest.json`, runs the tests, builds, and attaches `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` to a new GitHub release. It then has Mozilla sign the Firefox build on the unlisted AMO channel (uploading `git archive` of the tag as the source code) and attaches the signed `-firefox.xpi`. Signing usually takes minutes; the step waits up to 20 minutes. If it times out, the release keeps its zips and the signed file can be downloaded from the AMO Developer Hub and attached by hand. AMO accepts each version only once, so a failed signing run can't simply be re-run; bump the version instead.
-
-**One-time setup for signing:** create API credentials at [addons.mozilla.org/developers/addon/api/key](https://addons.mozilla.org/developers/addon/api/key/), then add them as repository secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` (**Settings → Secrets and variables → Actions**). Without them, releases still publish and the job logs a warning that no `.xpi` was signed. The first signed upload registers the add-on ID `developer@acdl-debugger.com` to your AMO account permanently.
-
-In parallel, the workflow submits the release's `-chrome.zip` to the Chrome Web Store (`scripts/chrome-web-store.mjs`, Chrome Web Store API v2). Google reviews it and publishes automatically once approved, using the visibility set in the dashboard. The store requires a higher `version` than the last upload, which the tag check already enforces. Stable Chrome only installs extensions from the store (or by enterprise policy), so the `-chrome.zip` on the release is for **Load unpacked**.
-
-**One-time setup for Chrome Web Store publishing:**
-
-1. In the [Google Cloud console](https://console.cloud.google.com/), pick or create a project, enable the **Chrome Web Store API**, and create a service account (it needs no IAM roles). Create a **JSON key** for it.
-2. In the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole), add the service account's email under **Account** (one service account per publisher). 2-step verification must be on for your Google account.
-3. In the repo's **Settings → Secrets and variables → Actions**, add the secret `CWS_SERVICE_ACCOUNT_KEY` (the whole JSON key file) and the variables `CWS_PUBLISHER_ID` (Dashboard → Publisher → Settings) and `CWS_EXTENSION_ID` (the item ID in the store URL).
-
-Without them the job logs a warning and skips. Publishing to the App Store is manual.
-
-To check all store credentials without releasing, run **Actions → Validate store credentials → Run workflow**. It is read-only: it loads your AMO profile and looks up the add-on ID, then gets a Chrome Web Store token and reads the item's status. Nothing is uploaded or submitted.
+**E2E tests** (`tests/e2e/`) load the built extension into headless Chromium (Playwright) and Firefox (puppeteer-core over WebDriver BiDi), serve a local page running the real ACDL library, and check that captures, state snapshots, navigation, strict-CSP pages, the panel's event list and detail view, Clear, and renamed data layers all work. Chromium comes from `npx playwright install chromium`. Firefox must be installed on the machine; set `FIREFOX_BIN` if it isn't on `PATH`. Safari isn't covered: it only runs on macOS.
 
 ## Architecture
 
@@ -159,7 +157,7 @@ manifest.json            # MV3 manifest for Chrome (Firefox/Safari variants deri
 build.mjs                # esbuild bundle script
 vitest.config.js         # unit test config (vitest.e2e.config.js for e2e)
 .github/workflows/       # CI (test + build) and tag-driven releases
-scripts/                 # icon generation + release version helpers
+scripts/                 # icon generation, release version checks, store publishing helpers
 assets/icon-source.png   # source artwork (not shipped in dist/)
 src/
   inject.js              # page-world entry (self-contained IIFE)
