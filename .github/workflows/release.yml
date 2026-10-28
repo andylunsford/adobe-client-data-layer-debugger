@@ -9,6 +9,7 @@ permissions:
 
 env:
   ZIP_PREFIX: acdl-debugger-${{ github.ref_name }}
+  AMO_SLUG: acdl-debugger
 
 jobs:
   release:
@@ -57,7 +58,7 @@ jobs:
             else
             echo "- **Chrome:** download \`$ZIP_PREFIX-chrome.zip\` and unzip it. Open \`chrome://extensions\`, turn on **Developer mode**, click **Load unpacked**, and select the unzipped folder."
             fi
-            echo "- **Firefox:** download \`$ZIP_PREFIX-firefox.xpi\` (signed by Mozilla) and open it in Firefox 142+, or drag it onto a Firefox window. If no .xpi is attached, signing is not configured or did not finish; \`$ZIP_PREFIX-firefox.zip\` is the unsigned build, which loads only as a temporary add-on from \`about:debugging#/runtime/this-firefox\`."
+            echo "- **Firefox:** install from [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/$AMO_SLUG/) (Firefox 142+); this version appears there after Mozilla's review. \`$ZIP_PREFIX-firefox.zip\` is the unsigned build, which loads only as a temporary add-on from \`about:debugging#/runtime/this-firefox\`."
             echo "- **Safari:** \`$ZIP_PREFIX-safari.zip\` is the web-extension folder for Xcode. Unzip it on a Mac and run \`xcrun safari-web-extension-converter\` on it (see the README)."
           } > release-notes.md
           cat release-notes.md
@@ -99,24 +100,30 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
-      - name: Sign Firefox add-on (AMO, unlisted)
+      - name: Submit Firefox add-on to AMO (listed)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: |
-          if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
-            echo "::warning::AMO_JWT_ISSUER / AMO_JWT_SECRET secrets are not set; the release has no signed Firefox .xpi."
+          if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
+            echo "::warning::AMO_JWT_ISSUER / AMO_JWT_SECRET secrets are not set; skipping AMO submission."
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          existing=$(node scripts/amo-version.mjs "$version")
+          if [ -n "$existing" ]; then
+            echo "::warning::AMO already has version $version ($existing channel); skipping submission. Bump the version to publish a new one."
             exit 0
           fi
           gh release download "$GITHUB_REF_NAME" --pattern "$ZIP_PREFIX-firefox.zip"
           unzip -q "$ZIP_PREFIX-firefox.zip" -d firefox-build
           git archive --format=zip -o source.zip HEAD
-          npx --yes web-ext@10.7.0 sign --channel=unlisted \
+          npx --yes web-ext@10.7.0 sign --channel=listed \
             --source-dir firefox-build \
             --upload-source-code source.zip \
-            --artifacts-dir signed --approval-timeout 1200000
-          xpi=$(ls signed/*.xpi)
-          mv "$xpi" "$ZIP_PREFIX-firefox.xpi"
-          gh release upload "$GITHUB_REF_NAME" "$ZIP_PREFIX-firefox.xpi"
+            --approval-timeout 0
+          echo "::notice::Submitted $version to AMO (listed); it goes live after Mozilla's review."

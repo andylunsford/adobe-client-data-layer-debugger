@@ -16,9 +16,19 @@
       <svg class="theme-icon theme-icon-light" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <svg class="theme-icon theme-icon-dark" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.5A6 6 0 0 1 5.5 2.5a6 6 0 1 0 8 8z" fill="currentColor"/></svg>
     </button>
+    <button id="settings-toggle" type="button" class="icon-button" aria-label="Settings" aria-expanded="false" aria-controls="settings" title="Settings">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.6 1.5h2.8l.4 1.9 1.2.7 1.8-.6 1.4 2.4-1.4 1.3v1.6l1.4 1.3-1.4 2.4-1.8-.6-1.2.7-.4 1.9H6.6l-.4-1.9-1.2-.7-1.8.6-1.4-2.4 1.4-1.3V7.2L1.8 5.9l1.4-2.4 1.8.6 1.2-.7z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+    </button>
     <button id="clear" type="button">Clear</button>
     <button id="export" type="button" class="primary">Export</button>
   </header>
+  <form id="settings" class="settings hidden" autocomplete="off">
+    <label for="layer-names">Data layer names</label>
+    <input id="layer-names" type="text" spellcheck="false" placeholder="e.g. myDataLayer" aria-describedby="layer-names-help" />
+    <button type="submit">Save</button>
+    <p id="layer-names-help" class="settings-help"><code>adobeDataLayer</code> is always watched. Add the names your site uses instead, such as one set in the Adobe Client Data Layer Tags extension (comma-separated). Changes apply to open tabs right away.</p>
+    <p id="layer-names-status" class="settings-status" role="status"></p>
+  </form>
   <div id="banner" class="banner hidden"></div>
   <main class="grid">
     <section class="events" aria-label="Event list">

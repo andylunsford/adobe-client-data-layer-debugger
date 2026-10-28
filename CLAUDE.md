@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.3.0).** All four pieces and nine lib modules are built; 84 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
+**Implemented (v0.3.0).** All four pieces and eleven lib modules are built; 103 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (10 tests, also in CI); Safari has never been run.
 
 Next work is v0.3+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -41,13 +41,14 @@ vitest.e2e.config.js             # e2e only: tests/e2e/**/*.e2e.js, 60 s timeout
 .nvmrc                           # Node version for CI (22)
 .github/workflows/
   ci.yml                         # test + build + web-ext lint (Firefox) on push to main and PRs
-  validate-credentials.yml       # manual (or on change): read-only check of AMO + CWS secrets/variables
+  validate-credentials.yml       # manual (or on change): read-only check of AMO + CWS secrets/variables + AMO lookup of package.json's version
   release.yml                    # on v*.*.* tag: verify, test, build, zip each dist/<target>, GitHub release; then Chrome Web Store submit + AMO signing jobs
 scripts/make-icons.mjs           # resizes assets/icon-source.png with sharp
 scripts/sync-manifest-version.mjs  # npm `version` hook: copies package.json version into manifest.json
 scripts/check-release-version.mjs  # release guard: tag must equal package.json + manifest.json version
 scripts/chrome-web-store.mjs     # CWS API v2: service-account JWT → token, upload zip, poll, publish (tested)
 scripts/check-store-credentials.mjs  # read-only: AMO profile + add-on ID lookup, CWS token + fetchStatus (tested)
+scripts/amo-version.mjs          # does AMO already have version X? (either channel; tested) — release skips if so
 assets/
   icon-source.png                # 1300×1300 source artwork (not shipped in dist/)
 src/
@@ -65,6 +66,8 @@ src/
     theme.js                     # normalize/next/load/save/apply theme
     target-manifest.js           # derives firefox/safari manifests from manifest.json
     json-highlight.js            # JSON → [{text, cls}] tokens; panel renders them as DOM nodes (no innerHTML)
+    layer-names.js               # parse/validate extra data layer names (JS identifiers, max 10); adobeDataLayer always first
+    layer-watcher.js             # hooks each watched name, dedupes ACDL instances, aggregates detection
   sidepanel/
     index.html                   # build also emits popup.html (class="popup") for Safari
     sidepanel.js
@@ -85,7 +88,7 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 npm install
 npm run icons      # regenerate icons from assets/icon-source.png
 npm run build      # produces dist/chrome, dist/firefox, dist/safari (--target=<name> for one)
-npm test           # 84 unit tests: 9 lib modules + store scripts
+npm test           # 103 unit tests: 11 lib modules + store scripts
 npm run build:watch  # dist/chrome only unless -- --target=<name>
 npm run test:e2e   # builds, then runs tests/e2e in headless Chromium + Firefox (needs Firefox installed)
 ```
@@ -99,7 +102,7 @@ npm version <patch|minor|major> -m "chore: release v%s"   # bumps package.json +
 git push --follow-tags                                    # tag push triggers .github/workflows/release.yml
 ```
 
-The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag, then two jobs act on the release's own zips: `chrome-web-store` submits `-chrome.zip` for review (`scripts/chrome-web-store.mjs`; secret `CWS_SERVICE_ACCOUNT_KEY` = service-account JSON key, variables `CWS_PUBLISHER_ID`/`CWS_EXTENSION_ID`; skips with a warning if unset; store requires a higher version than the last upload), and `firefox-sign` signs the Firefox build on AMO's unlisted channel (`web-ext sign`, source = `git archive` of the tag, 20 min approval wait) and uploads `-firefox.xpi` to the release. Signing needs repo secrets `AMO_JWT_ISSUER`/`AMO_JWT_SECRET`; without them the step warns and skips. AMO rejects a version it has already seen, so a failed signing run needs a version bump, not a re-run. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. Listed AMO and App Store publishing are not set up; stable Chrome only installs off-store extensions via Load unpacked or enterprise policy. The CWS v2 docs name the in-progress upload state both `UPLOAD_IN_PROGRESS` and `IN_PROGRESS`; the script accepts either.
+The release workflow fails fast if the tag doesn't match both versions. It publishes `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` (contents of each `dist/<target>`, no source maps) with notes built from commit subjects since the previous tag, then two jobs act on the release's own zips: `chrome-web-store` submits `-chrome.zip` for review (`scripts/chrome-web-store.mjs`; secret `CWS_SERVICE_ACCOUNT_KEY` = service-account JSON key, variables `CWS_PUBLISHER_ID`/`CWS_EXTENSION_ID`; skips with a warning if unset; store requires a higher version than the last upload), and `firefox-sign` submits the Firefox build to AMO's **listed** channel (`web-ext sign --channel=listed --approval-timeout 0`, source = `git archive` of the tag); it goes live at `addons.mozilla.org/firefox/addon/acdl-debugger/` after Mozilla's review, and no `.xpi` is attached (listed submissions return no signed file). Before submitting, `scripts/amo-version.mjs` asks AMO whether the version already exists in either channel (e.g. uploaded by hand in the Developer Hub) and skips with a warning if so; a failed lookup fails the step rather than submitting blind. AMO version numbers are unique across channels and an upload's channel can't be changed afterwards, so a version submitted to the wrong channel needs a version bump. The first listed version must be submitted by hand (or with `--amo-metadata`: categories, summary, license); later listed versions need no metadata. Needs repo secrets `AMO_JWT_ISSUER`/`AMO_JWT_SECRET`; without them the step warns and skips. Actions are pinned by commit SHA; bump the SHA and `# vX` comment together. App Store publishing is not set up; stable Chrome only installs off-store extensions via Load unpacked or enterprise policy. The CWS v2 docs name the in-progress upload state both `UPLOAD_IN_PROGRESS` and `IN_PROGRESS`; the script accepts either.
 
 ## Implementation conventions
 
@@ -111,6 +114,7 @@ The release workflow fails fast if the tag doesn't match both versions. It publi
 
 ## Known gotchas
 
+- **Renamed data layers:** the ACDL library always creates `window.adobeDataLayer`; the Tags extension's rename points another global at it, and self-hosted builds may expose only a custom name. Settings → "Data layer names" (stored in `storage.local` as `acdl-debugger:layerNames`) adds names to watch; `adobeDataLayer` is always watched. `content.js` sends names to `inject.js` via `postMessage` with `source: 'acdl-debugger-config'` (`request` from the page on start, `layers` from the content script on start, on request, and on `storage.onChanged`), so changes apply to open tabs without reload; `scope: 'all'` replays earlier events to the new listener. `layer-watcher` claims each ACDL instance once (two names for the same instance capture once, labelled with the first name) and reports detection once any name is found, or "not detected" only after all time out (the worker keeps the last detection message, so per-name reports would clobber each other). Events carry `dataLayer` (source name); the panel shows non-default names in the row meta.
 - **ACDL `scope`:** use `'all'` so registration order vs. page init doesn't matter. `inject.js` runs at `document_start` to minimize the gap.
 - **`structuredClone` in jsdom:** partial support — that's why `safe-clone.js` has a fallback path with `[Function]`, `[HTMLElement: <tag>]`, `[Circular →path]` markers. Tests exercise both branches.
 - **MV3 service worker eviction:** Chrome suspends the worker after ~30 s idle, which disconnects panel ports. The panel's `panel-connection` pings every 20 s (port messages keep the worker alive, Chrome 114+) and reconnects with backoff, re-subscribing the active tab; a same-tab snapshot is treated as a resync (selection/scroll/typing preserved). In the worker every listener waits on `ready` (the `rehydrate()` promise) so nothing reads the store before session storage is loaded. Mutations mark the tab dirty; a 1 s debounced flush writes to `chrome.storage.session` (10 MB quota; failures log `[acdl-debugger] session storage flush failed`).
