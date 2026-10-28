@@ -26,7 +26,7 @@ Built for debugging ACDL-instrumented sites.
 
 ### Store Links
 - [Chrome](https://chromewebstore.google.com/detail/adobe-client-data-layer-d/copbbelofncpohiigmpoagkaoflcejlp)
-- Firefox (TBA, use releases for now)
+- [Firefox](https://addons.mozilla.org/en-US/firefox/addon/acdl-debugger/)
 - Safari (TBD based on interest)
 
 
