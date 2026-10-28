@@ -1,6 +1,6 @@
 # Adobe Client Data Layer Debugger
 
-A Manifest V3 browser extension for **Chrome, Firefox and Safari** that passively captures every push to `window.adobeDataLayer`, deep-clones the full `getState()` snapshot per push, surfaces the timeline in a panel (Chrome **Side Panel**, Firefox **Sidebar**, Safari toolbar **popup**), and exports it as a self-describing JSON file for post-recording debugging.
+A browser extension for **Chrome, Firefox and Safari** that passively captures every push to `window.adobeDataLayer`, deep-clones the full `getState()` snapshot per push, surfaces the timeline in a panel (Chrome **Side Panel**, Firefox **Sidebar**, Safari toolbar **popup**), and exports it as a self-describing JSON file for post-recording debugging.
 
 Built for debugging ACDL-instrumented sites.
 
@@ -22,7 +22,15 @@ Built for debugging ACDL-instrumented sites.
 - **Safari 17.5+** on macOS, plus **Xcode** to wrap the extension in the app Safari requires
 - To build from source: **Node.js 22.12+** and npm (CI uses Node 22 — see `.nvmrc`)
 
-## Install (from a release)
+## Install
+
+### Store Links
+- [Chrome](https://chromewebstore.google.com/detail/adobe-client-data-layer-d/copbbelofncpohiigmpoagkaoflcejlp)
+- Firefox (TBA, use releases for now)
+- Safari (TBD based on interest)
+
+
+### Packaged Releases
 
 Each [release](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) attaches one zip per browser (`acdl-debugger-vX.Y.Z-chrome.zip`, `-firefox.zip`, `-safari.zip`) plus, once AMO signing is set up, a Mozilla-signed `acdl-debugger-vX.Y.Z-firefox.xpi`.
 
@@ -110,31 +118,6 @@ After editing, run `npm run build` and reload the extension (`chrome://extension
 CI (`.github/workflows/ci.yml`) runs the tests, builds all three targets, runs Mozilla's `web-ext lint` (the AMO validator) on the Firefox build, and runs the e2e suite in Chromium and Firefox on every push to `main` and every pull request.
 
 **E2E tests** (`tests/e2e/`) load the built extension into headless Chromium (Playwright) and Firefox (puppeteer-core over WebDriver BiDi), serve a local page running the real ACDL library, and check that captures, state snapshots, navigation, strict-CSP pages, the panel's event list and Clear all work. Chromium comes from `npx playwright install chromium`. Firefox must be installed on the machine; set `FIREFOX_BIN` if it isn't on `PATH`. Safari isn't covered: it only runs on macOS.
-
-## Releasing
-
-Releases are built and published by GitHub Actions (`.github/workflows/release.yml`) when a version tag is pushed:
-
-```bash
-npm version minor -m "chore: release v%s"   # or patch / major — bumps package.json + manifest.json, commits, tags
-git push --follow-tags                      # pushes the commit and tag; the workflow publishes the release
-```
-
-The workflow checks that the tag matches the version in `package.json` and `manifest.json`, runs the tests, builds, and attaches `acdl-debugger-vX.Y.Z-{chrome,firefox,safari}.zip` to a new GitHub release. It then has Mozilla sign the Firefox build on the unlisted AMO channel (uploading `git archive` of the tag as the source code) and attaches the signed `-firefox.xpi`. Signing usually takes minutes; the step waits up to 20 minutes. If it times out, the release keeps its zips and the signed file can be downloaded from the AMO Developer Hub and attached by hand. AMO accepts each version only once, so a failed signing run can't simply be re-run; bump the version instead.
-
-**One-time setup for signing:** create API credentials at [addons.mozilla.org/developers/addon/api/key](https://addons.mozilla.org/developers/addon/api/key/), then add them as repository secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` (**Settings → Secrets and variables → Actions**). Without them, releases still publish and the job logs a warning that no `.xpi` was signed. The first signed upload registers the add-on ID `developer@acdl-debugger.com` to your AMO account permanently.
-
-In parallel, the workflow submits the release's `-chrome.zip` to the Chrome Web Store (`scripts/chrome-web-store.mjs`, Chrome Web Store API v2). Google reviews it and publishes automatically once approved, using the visibility set in the dashboard. The store requires a higher `version` than the last upload, which the tag check already enforces. Stable Chrome only installs extensions from the store (or by enterprise policy), so the `-chrome.zip` on the release is for **Load unpacked**.
-
-**One-time setup for Chrome Web Store publishing:**
-
-1. In the [Google Cloud console](https://console.cloud.google.com/), pick or create a project, enable the **Chrome Web Store API**, and create a service account (it needs no IAM roles). Create a **JSON key** for it.
-2. In the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole), add the service account's email under **Account** (one service account per publisher). 2-step verification must be on for your Google account.
-3. In the repo's **Settings → Secrets and variables → Actions**, add the secret `CWS_SERVICE_ACCOUNT_KEY` (the whole JSON key file) and the variables `CWS_PUBLISHER_ID` (Dashboard → Publisher → Settings) and `CWS_EXTENSION_ID` (the item ID in the store URL).
-
-Without them the job logs a warning and skips. Publishing to the App Store is manual.
-
-To check all store credentials without releasing, run **Actions → Validate store credentials → Run workflow**. It is read-only: it loads your AMO profile and looks up the add-on ID, then gets a Chrome Web Store token and reads the item's status. Nothing is uploaded or submitted.
 
 ## Architecture
 
