@@ -34,7 +34,7 @@ Built for debugging ACDL-instrumented sites.
 
 Each [release](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) attaches one zip per browser (`acdl-debugger-vX.Y.Z-chrome.zip`, `-firefox.zip`, `-safari.zip`) plus, once AMO signing is set up, a Mozilla-signed `acdl-debugger-vX.Y.Z-firefox.xpi`.
 
-### Chrome
+#### Chrome
 
 1. Download the `-chrome.zip` and unzip it
 2. Open `chrome://extensions` and enable **Developer mode** (top-right toggle)
@@ -42,7 +42,7 @@ Each [release](https://github.com/andylunsford/adobe-client-data-layer-debugger/
 
 To update, replace that folder's contents with the newer release and click the reload icon on the extension's card.
 
-### Firefox
+#### Firefox
 
 - **Install (signed):** download the release's `-firefox.xpi` and open it in Firefox 142+ (or drag it onto a Firefox window). It stays installed across restarts. Mozilla signs it as *unlisted*: it is not on addons.mozilla.org and won't auto-update, so install each new release's `.xpi` the same way.
 - **Try it unsigned:** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick the `-firefox.zip` (or `dist/firefox/manifest.json`). Temporary add-ons are removed when Firefox restarts.
@@ -51,7 +51,7 @@ To update, replace that folder's contents with the newer release and click the r
 
 The add-on ID is `developer@acdl-debugger.com` (`src/lib/target-manifest.js`). AMO ties the add-on to it permanently once the first version is signed.
 
-### Safari
+#### Safari
 
 Safari only runs web extensions that ship inside a native macOS app, so the zip is the input to Apple's converter, not something you install directly. On a Mac with Xcode:
 
