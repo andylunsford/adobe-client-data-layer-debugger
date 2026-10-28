@@ -75,6 +75,14 @@ describe.each(Object.keys(launchers))('%s', (target) => {
     await waitUntil(async () => (await rowNames()).length === 2);
     expect(await rowNames()).toEqual(['page.view', 'cta.click']);
 
+    const detail = await panel.evaluate(() => {
+      document.querySelector('#event-list li[data-seq]:last-child').click();
+      const el = document.getElementById('detail-message');
+      return { text: el.textContent, key: el.querySelector('.jk')?.textContent, value: el.querySelector('.js')?.textContent };
+    });
+    expect(JSON.parse(detail.text)).toEqual({ event: 'cta.click' });
+    expect(detail).toMatchObject({ key: '"event":', value: '"cta.click"' });
+
     await panel.evaluate(() => document.getElementById('clear').click());
     await waitUntil(async () => (await rowNames()).length === 0);
     expect(await exportCapture(panel, `${server.origin}/?ui`)).toBeNull();
