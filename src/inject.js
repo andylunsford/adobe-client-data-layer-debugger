@@ -1,4 +1,5 @@
-import { installAcdlHook } from './lib/acdl-hook.js';
+import { createLayerWatcher } from './lib/layer-watcher.js';
+import { DEFAULT_LAYER, watchedLayers } from './lib/layer-names.js';
 import { makePageLoadId } from './lib/ids.js';
 
 const pageLoadId = makePageLoadId();
@@ -15,8 +16,8 @@ post('page-load', {
   loadedAt: new Date().toISOString()
 });
 
-installAcdlHook({
-  getDataLayer: () => window.adobeDataLayer,
+const watcher = createLayerWatcher({
+  root: window,
   onCapture: (e) => {
     post('event', {
       ...e,
@@ -26,7 +27,17 @@ installAcdlHook({
       pageTitle: document.title
     });
   },
-  onDetectionResult: (result) => {
+  onDetection: (result) => {
     post('detection', { pageLoadId, ...result });
   }
 });
+
+watcher.watch([DEFAULT_LAYER]);
+
+window.addEventListener('message', (event) => {
+  if (event.source !== window) return;
+  const data = event.data;
+  if (data?.source !== 'acdl-debugger-config' || data.type !== 'layers') return;
+  watcher.watch(watchedLayers(data.names));
+});
+window.postMessage({ source: 'acdl-debugger-config', type: 'request' }, '*');

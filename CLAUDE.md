@@ -12,7 +12,7 @@ The original design spec and implementation plan live in the authoring workspace
 
 ## Current status
 
-**Implemented (v0.3.0).** All four pieces and nine lib modules are built; 88 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (6 tests, also in CI); Safari has never been run.
+**Implemented (v0.3.0).** All four pieces and eleven lib modules are built; 103 unit tests pass (`npm test`). `npm run build` produces loadable `dist/chrome`, `dist/firefox`, `dist/safari`. Events can carry a label + note (event annotations), and captures now persist across top-level page navigation within a tab. The side panel now reconnects to the service worker after MV3 eviction (heartbeat + backoff, resync without losing selection/scroll/typing), has a System/Light/Dark theme toggle, and ships the real extension icon. Firefox and Safari builds are derived from the Chrome manifest at build time; Chrome and Firefox are exercised end to end by `npm run test:e2e` (10 tests, also in CI); Safari has never been run.
 
 Next work is v0.3+ — see **Out of scope (v1)** below for the deferred backlog.
 
@@ -66,6 +66,8 @@ src/
     theme.js                     # normalize/next/load/save/apply theme
     target-manifest.js           # derives firefox/safari manifests from manifest.json
     json-highlight.js            # JSON → [{text, cls}] tokens; panel renders them as DOM nodes (no innerHTML)
+    layer-names.js               # parse/validate extra data layer names (JS identifiers, max 10); adobeDataLayer always first
+    layer-watcher.js             # hooks each watched name, dedupes ACDL instances, aggregates detection
   sidepanel/
     index.html                   # build also emits popup.html (class="popup") for Safari
     sidepanel.js
@@ -86,7 +88,7 @@ All non-trivial logic lives in `src/lib/` so it can be unit-tested in Node witho
 npm install
 npm run icons      # regenerate icons from assets/icon-source.png
 npm run build      # produces dist/chrome, dist/firefox, dist/safari (--target=<name> for one)
-npm test           # 88 unit tests: 9 lib modules + store scripts
+npm test           # 103 unit tests: 11 lib modules + store scripts
 npm run build:watch  # dist/chrome only unless -- --target=<name>
 npm run test:e2e   # builds, then runs tests/e2e in headless Chromium + Firefox (needs Firefox installed)
 ```
@@ -112,6 +114,7 @@ The release workflow fails fast if the tag doesn't match both versions. It publi
 
 ## Known gotchas
 
+- **Renamed data layers:** the ACDL library always creates `window.adobeDataLayer`; the Tags extension's rename points another global at it, and self-hosted builds may expose only a custom name. Settings → "Data layer names" (stored in `storage.local` as `acdl-debugger:layerNames`) adds names to watch; `adobeDataLayer` is always watched. `content.js` sends names to `inject.js` via `postMessage` with `source: 'acdl-debugger-config'` (`request` from the page on start, `layers` from the content script on start, on request, and on `storage.onChanged`), so changes apply to open tabs without reload; `scope: 'all'` replays earlier events to the new listener. `layer-watcher` claims each ACDL instance once (two names for the same instance capture once, labelled with the first name) and reports detection once any name is found, or "not detected" only after all time out (the worker keeps the last detection message, so per-name reports would clobber each other). Events carry `dataLayer` (source name); the panel shows non-default names in the row meta.
 - **ACDL `scope`:** use `'all'` so registration order vs. page init doesn't matter. `inject.js` runs at `document_start` to minimize the gap.
 - **`structuredClone` in jsdom:** partial support — that's why `safe-clone.js` has a fallback path with `[Function]`, `[HTMLElement: <tag>]`, `[Circular →path]` markers. Tests exercise both branches.
 - **MV3 service worker eviction:** Chrome suspends the worker after ~30 s idle, which disconnects panel ports. The panel's `panel-connection` pings every 20 s (port messages keep the worker alive, Chrome 114+) and reconnects with backoff, re-subscribing the active tab; a same-tab snapshot is treated as a resync (selection/scroll/typing preserved). In the worker every listener waits on `ready` (the `rehydrate()` promise) so nothing reads the store before session storage is loaded. Mutations mark the tab dirty; a 1 s debounced flush writes to `chrome.storage.session` (10 MB quota; failures log `[acdl-debugger] session storage flush failed`).

@@ -62,6 +62,19 @@ describe('installAcdlHook', () => {
     expect(onCapture).not.toHaveBeenCalled();
   });
 
+  it('attaches no listeners when claim rejects the ACDL instance', async () => {
+    const fake = makeFakeAcdl();
+    const onCapture = vi.fn();
+    const onDetection = vi.fn();
+    const claim = vi.fn(() => false);
+    installAcdlHook({ getDataLayer: () => fake.arr, onCapture, onDetectionResult: onDetection, claim });
+    await vi.advanceTimersByTimeAsync(0);
+    fake.pushEvent({ event: 'cta.click' });
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(onCapture).not.toHaveBeenCalled();
+    expect(onDetection).toHaveBeenCalledWith({ acdlDetected: true });
+  });
+
   it('replays past events via scope=all', async () => {
     const fake = makeFakeAcdl();
     fake.pushEvent({ event: 'page.view', page: { name: 'home' } });
