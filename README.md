@@ -1,6 +1,6 @@
 # Adobe Client Data Layer Debugger
 
-![Adobe Client Data Layer](https://img.shields.io/badge/Adobe_Client_Data_Layer-Debugger-red) ![Browsers](https://img.shields.io/badge/browsers-Chrome%20%7C%20Firefox%20%7C%20Safari-lightgrey)
+![Browsers](https://img.shields.io/badge/browsers-Chrome%20%7C%20Firefox%20%7C%20Safari-lightgrey)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/copbbelofncpohiigmpoagkaoflcejlp?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/adobe-client-data-layer-d/copbbelofncpohiigmpoagkaoflcejlp) [![Firefox Add-ons](https://img.shields.io/amo/v/acdl-debugger?label=Firefox%20Add-ons)](https://addons.mozilla.org/en-US/firefox/addon/acdl-debugger/) [![Release](https://img.shields.io/github/v/release/andylunsford/adobe-client-data-layer-debugger)](https://github.com/andylunsford/adobe-client-data-layer-debugger/releases/latest) [![CI](https://github.com/andylunsford/adobe-client-data-layer-debugger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andylunsford/adobe-client-data-layer-debugger/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache_2.0-blue)](LICENSE)
 
 A browser extension for **Chrome, Firefox and Safari** that passively captures every push to `window.adobeDataLayer`, deep-clones the full `getState()` snapshot per push, surfaces the timeline in a panel (Chrome **Side Panel**, Firefox **Sidebar**, Safari toolbar **popup**), and exports it as a self-describing JSON file for post-recording debugging.
@@ -53,8 +53,6 @@ To update, replace that folder's contents with the newer release and click the r
 - **Install:** use [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/acdl-debugger/) (Firefox 142+). Firefox only installs Mozilla-signed add-ons permanently, and releases no longer attach a signed `.xpi`.
 - **Try it unsigned:** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick the `-firefox.zip` (or `dist/firefox/manifest.json`). Temporary add-ons are removed when Firefox restarts.
 - Click the toolbar button (or **View → Sidebar**) to open the sidebar.
-
-The add-on ID is `developer@acdl-debugger.com` (`src/lib/target-manifest.js`). AMO ties the add-on to it permanently once the first version is signed.
 
 #### Safari
 
