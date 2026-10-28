@@ -16,6 +16,7 @@ All data is processed and kept locally in your browser, only to show it to you. 
 
 - **Captured events**, including any labels or notes you add to them, are held in `chrome.storage.session`. This storage is in memory only, never written to disk, and cleared when you close the browser. Captures for a tab are also removed when you click **Clear** or close the tab. They persist while you navigate within the same tab so you can debug multi-page flows.
 - **Your theme preference** (System, Light, or Dark) is saved in the side panel's local storage on your device.
+- **Data layer names** you add under Settings are saved in `chrome.storage.local` on your device, so the extension knows which page variables to watch. They stay until you change them.
 
 ## Exports
 

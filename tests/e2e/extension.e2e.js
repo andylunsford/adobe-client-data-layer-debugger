@@ -87,4 +87,38 @@ describe.each(Object.keys(launchers))('%s', (target) => {
     await waitUntil(async () => (await rowNames()).length === 0);
     expect(await exportCapture(panel, `${server.origin}/?ui`)).toBeNull();
   });
+
+  async function saveLayerNames(value) {
+    await panel.evaluate((v) => {
+      document.getElementById('layer-names').value = v;
+      document.getElementById('settings').requestSubmit();
+    }, value);
+    await waitUntil(() => panel.evaluate(() => document.getElementById('layer-names-status').textContent.startsWith('Watching')));
+  }
+
+  it('captures a layer that only exists under a custom name once it is added in Settings', async () => {
+    const page = await browser.newPage();
+    await page.goto(`${server.origin}/?renamed=only`);
+    await page.waitForFunction(() => typeof window.myDataLayer?.getState === 'function' && !('adobeDataLayer' in window));
+    await page.evaluate(() => window.myDataLayer.push({ event: 'cta.click', cta: { id: 'apply' } }));
+    expect((await exportCapture(panel, `${server.origin}/?renamed=only`))?.events ?? []).toHaveLength(0);
+
+    await saveLayerNames('myDataLayer');
+    const envelope = await waitForEvents(panel, `${server.origin}/?renamed=only`, 2);
+    expect(envelope.events.map(e => [e.eventName, e.dataLayer])).toEqual([['page.view', 'myDataLayer'], ['cta.click', 'myDataLayer']]);
+    expect(envelope.pages[0].acdlDetected).toBe(true);
+  });
+
+  it('captures each event once when the custom name and adobeDataLayer are the same instance', async () => {
+    await saveLayerNames('myDataLayer');
+    const page = await browser.newPage();
+    await page.goto(`${server.origin}/?renamed=both`);
+    await page.waitForFunction(() => window.myDataLayer === window.adobeDataLayer && typeof window.myDataLayer.getState === 'function');
+    await page.evaluate(() => window.myDataLayer.push({ event: 'cta.click' }));
+    await waitForEvents(panel, `${server.origin}/?renamed=both`, 2);
+    await new Promise(r => setTimeout(r, 500));
+    const envelope = await exportCapture(panel, `${server.origin}/?renamed=both`);
+    expect(envelope.events.map(e => e.eventName)).toEqual(['page.view', 'cta.click']);
+    await saveLayerNames('');
+  });
 });

@@ -1,6 +1,6 @@
 import { safeClone } from './safe-clone.js';
 
-export function installAcdlHook({ getDataLayer, onCapture, onDetectionResult, timeoutMs = 5000, pollIntervalMs = 100 }) {
+export function installAcdlHook({ getDataLayer, onCapture, onDetectionResult, claim = () => true, timeoutMs = 5000, pollIntervalMs = 100 }) {
   let installed = false;
   let detected = false;
   let elapsed = 0;
@@ -11,6 +11,7 @@ export function installAcdlHook({ getDataLayer, onCapture, onDetectionResult, ti
     if (!dl || typeof dl.push !== 'function') return false;
 
     dl.push(function (acdl) {
+      if (!claim(acdl)) return;
       const capture = (event, eventType) => {
         const eventClone = safeClone(event);
         const stateClone = safeClone(acdl.getState());

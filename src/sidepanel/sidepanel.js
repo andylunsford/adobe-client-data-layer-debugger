@@ -1,5 +1,6 @@
 import { ext } from '../ext.js';
 import { highlightJsonTokens } from '../lib/json-highlight.js';
+import { DEFAULT_LAYER, LAYER_NAMES_KEY, parseLayerNames, watchedLayers } from '../lib/layer-names.js';
 import { createPanelConnection } from '../lib/panel-connection.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from '../lib/theme.js';
 
@@ -144,7 +145,8 @@ function appendEventRow(ev) {
   name.textContent = ev.eventName ? ev.eventName : `(${ev.eventType})`;
   const meta = document.createElement('span');
   meta.className = 'event-meta';
-  meta.textContent = `#${ev.index} · ${formatTime(ev.timestamp)}${ev.stateSerialization === 'fallback' ? ' · fallback' : ''}`;
+  const layer = ev.dataLayer && ev.dataLayer !== DEFAULT_LAYER ? ` · ${ev.dataLayer}` : '';
+  meta.textContent = `#${ev.index} · ${formatTime(ev.timestamp)}${layer}${ev.stateSerialization === 'fallback' ? ' · fallback' : ''}`;
   li.append(name, meta);
   li.addEventListener('click', () => selectBySeq(ev.seq));
   renderRowAnnotation(li, ev);
@@ -233,7 +235,7 @@ function handleMessage(msg) {
     }
     if (msg.payload.acdlDetected === false) {
       setStatus('No Adobe Client Data Layer detected on this page.');
-      showBanner('No Adobe Client Data Layer detected on this page.');
+      showBanner('No Adobe Client Data Layer detected on this page. If the site renames it, add the name under Settings.');
     } else {
       hideBanner();
     }
@@ -334,6 +336,52 @@ els.theme.addEventListener('click', () => {
 });
 
 renderThemeButton();
+
+const settings = {
+  toggle: document.getElementById('settings-toggle'),
+  form: document.getElementById('settings'),
+  input: document.getElementById('layer-names'),
+  status: document.getElementById('layer-names-status')
+};
+
+function setSettingsStatus(text, isError = false) {
+  settings.status.textContent = text;
+  settings.status.classList.toggle('is-error', isError);
+  settings.input.setAttribute('aria-invalid', String(isError));
+}
+
+async function loadLayerNames() {
+  try {
+    const { [LAYER_NAMES_KEY]: stored } = await ext.storage.local.get(LAYER_NAMES_KEY);
+    settings.input.value = watchedLayers(stored).slice(1).join(', ');
+  } catch {
+    setSettingsStatus('Could not load saved names.', true);
+  }
+}
+
+settings.toggle.addEventListener('click', () => {
+  const open = !settings.form.classList.toggle('hidden');
+  settings.toggle.setAttribute('aria-expanded', String(open));
+  if (open) settings.input.focus();
+});
+
+settings.form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const { names, invalid } = parseLayerNames(settings.input.value);
+  if (invalid.length) {
+    setSettingsStatus(`Not a valid JavaScript name: ${invalid.join(', ')}`, true);
+    return;
+  }
+  try {
+    await ext.storage.local.set({ [LAYER_NAMES_KEY]: names });
+    settings.input.value = names.join(', ');
+    setSettingsStatus(names.length ? `Watching adobeDataLayer, ${names.join(', ')}.` : 'Watching adobeDataLayer only.');
+  } catch {
+    setSettingsStatus('Could not save names.', true);
+  }
+});
+
+loadLayerNames();
 
 async function init() {
   connection = createPanelConnection({
