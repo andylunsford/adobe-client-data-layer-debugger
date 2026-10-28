@@ -1,4 +1,5 @@
 import { ext } from '../ext.js';
+import { highlightJsonTokens } from '../lib/json-highlight.js';
 import { createPanelConnection } from '../lib/panel-connection.js';
 import { applyTheme, loadTheme, nextTheme, saveTheme } from '../lib/theme.js';
 
@@ -161,18 +162,19 @@ function appendNewEvent(ev) {
   els.empty.classList.add('hidden');
 }
 
-function highlightJson(value) {
-  const escaped = JSON.stringify(value, null, 2)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return escaped.replace(
-    /("(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|\b(?:true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-    (match) => {
-      if (match.startsWith('"')) return `<span class="${match.endsWith(':') ? 'jk' : 'js'}">${match}</span>`;
-      if (match === 'true' || match === 'false') return `<span class="jb">${match}</span>`;
-      if (match === 'null') return `<span class="jl">${match}</span>`;
-      return `<span class="jn">${match}</span>`;
+function renderJson(el, value) {
+  const frag = document.createDocumentFragment();
+  for (const { text, cls } of highlightJsonTokens(value)) {
+    if (!cls) {
+      frag.append(text);
+      continue;
     }
-  );
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    frag.append(span);
+  }
+  el.replaceChildren(frag);
 }
 
 function selectBySeq(seq) {
@@ -190,8 +192,8 @@ function selectBySeq(seq) {
     els.detailState.textContent = '';
     return;
   }
-  els.detailMessage.innerHTML = highlightJson(ev.message);
-  els.detailState.innerHTML = highlightJson(ev.state);
+  renderJson(els.detailMessage, ev.message);
+  renderJson(els.detailState, ev.state);
 }
 
 function formatTime(iso) {

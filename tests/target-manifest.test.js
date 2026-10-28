@@ -49,7 +49,7 @@ describe('manifestForTarget', () => {
     it('declares a gecko id, minimum version and no data collection', () => {
       expect(m.browser_specific_settings.gecko).toEqual({
         id: 'developer@acdl-debugger.com',
-        strict_min_version: '140.0',
+        strict_min_version: '142.0',
         data_collection_permissions: { required: ['none'] }
       });
     });

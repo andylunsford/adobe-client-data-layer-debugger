@@ -16,7 +16,7 @@ const entryPoints = {
   'sidepanel/theme':     'src/sidepanel/theme.js'
 };
 
-const esbuildTarget = { chrome: 'chrome120', firefox: 'firefox140', safari: 'safari17' };
+const esbuildTarget = { chrome: 'chrome120', firefox: 'firefox142', safari: 'safari17' };
 
 const esbuildOptions = (target) => ({
   entryPoints,
